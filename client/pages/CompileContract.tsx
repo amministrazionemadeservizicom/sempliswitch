@@ -376,19 +376,48 @@ export default function CompileContract() {
       const { text, previews } = await extractTextFromFiles(Array.from(files));
       setDocPreviews(prev => [...prev, ...previews]);
 
-      // Show success message
-      toast.success("Documento elaborato con Tesseract.js");
+      // Debug: log extracted text
+      console.log("📄 Testo estratto OCR:", text);
 
       // Detect document type and parse
       const detectedType = detectDocType(text);
-      const parsed = parseFieldsByType(detectedType, text);
+      console.log("🔍 Tipo documento rilevato:", detectedType);
 
-      // Auto-fill form fields
-      if (parsed.nome) setValue("nome", parsed.nome);
-      if (parsed.cognome) setValue("cognome", parsed.cognome);
-      if (parsed.codiceFiscale) setValue("codiceFiscale", parsed.codiceFiscale);
-      if (parsed.numeroDocumento) setValue("docNumero", parsed.numeroDocumento);
-      if (parsed.scadenza) setValue("docScadenza", parsed.scadenza);
+      const parsed = parseFieldsByType(detectedType, text);
+      console.log("📋 Dati parsificati:", parsed);
+
+      // Show success message
+      toast.success("Documento elaborato con successo. I campi sono stati compilati automaticamente.");
+
+      // Auto-fill form fields with debug
+      let filledFields = 0;
+      if (parsed.nome) {
+        setValue("nome", parsed.nome);
+        console.log("✅ Nome compilato:", parsed.nome);
+        filledFields++;
+      }
+      if (parsed.cognome) {
+        setValue("cognome", parsed.cognome);
+        console.log("✅ Cognome compilato:", parsed.cognome);
+        filledFields++;
+      }
+      if (parsed.codiceFiscale) {
+        setValue("codiceFiscale", parsed.codiceFiscale);
+        console.log("✅ Codice Fiscale compilato:", parsed.codiceFiscale);
+        filledFields++;
+      }
+      if (parsed.numeroDocumento) {
+        setValue("docNumero", parsed.numeroDocumento);
+        console.log("✅ Numero documento compilato:", parsed.numeroDocumento);
+        filledFields++;
+      }
+      if (parsed.scadenza) {
+        setValue("docScadenza", parsed.scadenza);
+        console.log("✅ Scadenza compilata:", parsed.scadenza);
+        filledFields++;
+      }
+
+      console.log(`📊 Totale campi compilati: ${filledFields}/5`);
 
       setDocumentUploaded(true);
       setOcrSource(prev => ({ ...prev, doc: 'tesseract' }));
