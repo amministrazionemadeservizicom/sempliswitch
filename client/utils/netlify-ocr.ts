@@ -1,3 +1,7 @@
+// Fallback imports for local OCR when Netlify is not available
+import { extractTextFromFiles } from './ocr';
+import { detectDocType, parseFieldsByType } from './id-parsers';
+
 // Types only import to avoid conflicts
 type ParsedFields = {
   nome?: string;
