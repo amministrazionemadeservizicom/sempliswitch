@@ -69,6 +69,8 @@ export const adminApi: AdminApiInterface = {
   // Get all contracts using admin privileges
   async getAllContracts() {
     try {
+      console.log('🔄 Attempting to fetch contracts via admin API...');
+
       const response = await fetch('/.netlify/functions/admin-contracts', {
         method: 'GET',
         headers: {
@@ -76,14 +78,38 @@ export const adminApi: AdminApiInterface = {
         }
       });
 
+      console.log('📡 Admin API response status:', response.status);
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('❌ Admin API error response:', errorText);
+
+        // If we get HTML instead of JSON, it means the function doesn't exist or there's a routing issue
+        if (errorText.includes('<!DOCTYPE') || errorText.includes('<html>')) {
+          throw new Error('Netlify function not found. The admin-contracts endpoint may not be deployed or accessible.');
+        }
+
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('❌ Expected JSON but got:', contentType, text);
+        throw new Error('Invalid response format from admin API');
       }
 
       const result = await response.json();
+      console.log('✅ Successfully fetched contracts via admin API:', result);
       return result.contracts || [];
     } catch (error: any) {
       console.error('❌ Error fetching contracts via admin API:', error);
+
+      // Provide a more user-friendly error message
+      if (error.message.includes('Netlify function not found')) {
+        throw new Error('Servizio non disponibile. Le funzioni di amministrazione potrebbero non essere attive.');
+      }
+
       throw error;
     }
   },
@@ -166,7 +192,7 @@ export const adminApi: AdminApiInterface = {
       const result = await response.json();
       return result;
     } catch (error: any) {
-      console.error('��� Error deleting contract:', error);
+      console.error('❌ Error deleting contract:', error);
       throw error;
     }
   },
