@@ -1,9 +1,15 @@
-import { RequestHandler } from "express";
-import vision from "@google-cloud/vision";
+import { Request, Response } from "express";
+import { ImageAnnotatorClient } from "@google-cloud/vision";
 import { detectDocType, parseFieldsByType } from "../../client/utils/id-parsers";
+import { UploadedFile } from "express-fileupload";
+
+// Extend Express Request type to include files
+interface RequestWithFiles extends Request {
+  files?: { [name: string]: UploadedFile | UploadedFile[] } | null | undefined;
+}
 
 // Initialize Google Cloud Vision client with credentials from environment
-let visionClient: vision.ImageAnnotatorClient;
+let visionClient: ImageAnnotatorClient;
 
 try {
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
