@@ -271,7 +271,7 @@ export default function CompileContract() {
     return () => {
       docPreviews.forEach(url => URL.revokeObjectURL(url));
       billPreviews.forEach(url => URL.revokeObjectURL(url));
-      terminateOcrWorker().catch(() => {});
+      // OCR cleanup non più necessario con Netlify Functions
     };
   }, [docPreviews, billPreviews]);
   
