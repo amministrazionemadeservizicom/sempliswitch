@@ -291,6 +291,30 @@ export default function Contracts() {
                 Nuovo Contratto
               </Button>
             </Link>
+
+            {/* Firebase Test Button (only for admin) */}
+            {userRole === 'admin' && (
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  const result = await testFirebaseConnection();
+                  if (result.success) {
+                    toast({
+                      title: "✅ Firebase OK",
+                      description: `Connessione riuscita. ${result.documentsCount} contratti trovati.`
+                    });
+                  } else {
+                    toast({
+                      variant: "destructive",
+                      title: "❌ Firebase Error",
+                      description: result.error
+                    });
+                  }
+                }}
+              >
+                🔥 Test Firebase
+              </Button>
+            )}
           </div>
 
           {/* Barra di ricerca principale */}
