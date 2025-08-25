@@ -123,18 +123,28 @@ export function parseCIE(text: string): ParsedFields {
       }
     }
 
-    // SCADENZA / EXPIRY pattern - value on next line
+    // SCADENZA / EXPIRY pattern - value on next line or same line
     if (/SCADENZA\s*\/\s*EXPIRY/i.test(line) && !scadenza) {
-      const dateMatch = nextLine.match(/(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/);
+      // Try next line first
+      let dateMatch = nextLine.match(/(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/);
+      if (!dateMatch) {
+        // Try same line
+        dateMatch = line.match(/SCADENZA.*?(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/i);
+      }
       if (dateMatch) {
         scadenza = toIsoDateLike(dateMatch[1]);
         console.log('📝 Found scadenza:', scadenza);
       }
     }
 
-    // EMISSIONE / ISSUING pattern - value on next line
+    // EMISSIONE / ISSUING pattern - value on next line or same line
     if (/EMISSIONE\s*\/\s*ISSUING/i.test(line) && !emissione) {
-      const dateMatch = nextLine.match(/(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/);
+      // Try next line first
+      let dateMatch = nextLine.match(/(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/);
+      if (!dateMatch) {
+        // Try same line
+        dateMatch = line.match(/EMISSIONE.*?(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/i);
+      }
       if (dateMatch) {
         emissione = toIsoDateLike(dateMatch[1]);
         console.log('📝 Found emissione:', emissione);
