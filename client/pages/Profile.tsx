@@ -91,22 +91,27 @@ export default function Profile() {
   }, [currentUser]);
 
   const fetchUserData = async () => {
-    if (!currentUser?.uid) {
-      console.log('❌ Profile: No currentUser.uid, redirecting to login');
+    // Try to get UID from currentUser or localStorage
+    const uid = currentUser?.uid || localStorage.getItem('uid');
+
+    if (!uid) {
+      console.log('❌ Profile: No UID found, redirecting to login');
       navigate('/');
       return;
     }
 
+    console.log('🔍 Profile: Using UID:', uid);
+
     try {
       setLoading(true);
-      console.log('📡 Profile: Fetching user data for uid:', currentUser.uid);
-      const userDoc = await getDoc(doc(db, "utenti", currentUser.uid));
+      console.log('📡 Profile: Fetching user data for uid:', uid);
+      const userDoc = await getDoc(doc(db, "utenti", uid));
       
       if (userDoc.exists()) {
         const data = userDoc.data();
         console.log('✅ Profile: User document found:', data);
         const profileData: UserData = {
-          uid: currentUser.uid,
+          uid: uid,
           nome: data.nome || '',
           cognome: data.cognome || '',
           fullName: data.fullName || `${data.nome || ''} ${data.cognome || ''}`.trim(),
@@ -134,13 +139,58 @@ export default function Profile() {
         setFormData(profileData);
         console.log('✅ Profile: User profile data set:', profileData);
       } else {
-        console.log('❌ Profile: User document not found for uid:', currentUser.uid);
-        toast({
-          variant: "destructive",
-          title: "Errore",
-          description: "Dati utente non trovati"
-        });
-        navigate('/dashboard');
+        console.log('❌ Profile: User document not found for uid:', uid);
+
+        // Try to create basic profile from localStorage
+        const storedUserName = localStorage.getItem('userName') || '';
+        const storedRole = localStorage.getItem('userRole') || 'consulente';
+        const storedEmail = localStorage.getItem('userEmail') || '';
+
+        if (storedUserName && storedRole) {
+          const [nome, ...cognomeParts] = storedUserName.split(' ');
+          const cognome = cognomeParts.join(' ');
+
+          const basicProfileData: UserData = {
+            uid: uid,
+            nome: nome || '',
+            cognome: cognome || '',
+            fullName: storedUserName,
+            email: storedEmail,
+            ruolo: storedRole,
+            attivo: true,
+            telefono: '',
+            indirizzo: '',
+            citta: '',
+            provincia: '',
+            cap: '',
+            codiceFiscale: '',
+            partitaIva: '',
+            iban: '',
+            note: '',
+            pianoCompensi: '',
+            gestoriAssegnati: [],
+            master: '',
+            createdAt: '',
+            lastLogin: '',
+            lastUpdated: ''
+          };
+
+          setUserData(basicProfileData);
+          setFormData(basicProfileData);
+          console.log('✅ Profile: Created basic profile from localStorage:', basicProfileData);
+
+          toast({
+            title: "Profilo caricato",
+            description: "Alcuni dati potrebbero non essere disponibili. Completa il tuo profilo.",
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Errore",
+            description: "Dati utente non trovati"
+          });
+          navigate('/dashboard');
+        }
       }
     } catch (error) {
       console.error("Error fetching user data:", error);
