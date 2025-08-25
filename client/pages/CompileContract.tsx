@@ -508,6 +508,8 @@ export default function CompileContract() {
         },
         pod: data.pod,
         pdr: data.pdr,
+        potenzaImpegnataKw: data.potenzaImpegnataKw,
+        usiGas: data.usiGas,
         residenziale: data.residenziale,
         offerte: selectedOffers
       };
