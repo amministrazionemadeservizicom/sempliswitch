@@ -13,7 +13,7 @@ interface AppLayoutProps {
   showNavigation?: boolean;
 }
 
-export default function AppLayout({ 
+export default function AppLayout({
   children,
   userRole = "consulente",
   showNavigation = true
@@ -21,35 +21,54 @@ export default function AppLayout({
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userFullName, setUserFullName] = useState<string>("");
+  const [userData, setUserData] = useState<any>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   useEffect(() => {
-    const fetchUserName = async () => {
+    const fetchUserData = async () => {
       try {
         const uid = localStorage.getItem("uid");
         if (!uid) {
           setUserFullName("Utente");
+          setUserData(null);
           return;
         }
 
         const userDoc = await getDoc(doc(db, "utenti", uid));
         if (userDoc.exists()) {
-          const userData = userDoc.data();
+          const data = userDoc.data();
+          setUserData({ ...data, uid });
+
           // Try fullName first, then concatenate nome + cognome, fallback to "Utente"
-          const fullName = userData.fullName ||
-                            (userData.nome && userData.cognome ? `${userData.nome} ${userData.cognome}` : null) ||
+          const fullName = data.fullName ||
+                            (data.nome && data.cognome ? `${data.nome} ${data.cognome}` : null) ||
                            "Utente";
           setUserFullName(fullName);
         } else {
           setUserFullName("Utente");
+          setUserData(null);
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
         setUserFullName("Utente");
+        setUserData(null);
       }
     };
 
-    fetchUserName();
+    fetchUserData();
   }, []);
+
+  const handleUserDataUpdate = (updatedData: any) => {
+    setUserData(updatedData);
+    const fullName = updatedData.fullName ||
+                      (updatedData.nome && updatedData.cognome ? `${updatedData.nome} ${updatedData.cognome}` : null) ||
+                     "Utente";
+    setUserFullName(fullName);
+  };
+
+  const handleUserClick = () => {
+    setIsProfileModalOpen(true);
+  };
 
   const handleLogout = () => {
     localStorage.clear();
