@@ -252,6 +252,7 @@ export default function Users() {
       gestoriAssegnati: [],
       master: ''
     });
+    setSelectedUser(null);
   };
 
   const utentiVisibili = Array.isArray(users) ? users : [];
