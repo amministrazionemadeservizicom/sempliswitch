@@ -65,8 +65,8 @@ const createValidationSchema = (selectedOffer?: Offer) => {
     docTipo: z.enum(["CARTA_IDENTITA", "PATENTE", "PASSAPORTO"]),
     docRilasciatoDa: z.enum(["Comune", "MC", "MCTC", "MIT UCO", "Questura"]),
     docNumero: z.string().optional(),
-    docRilascio: z.date({ required_error: "Data di rilascio obbligatoria" }),
-    docScadenza: z.date({ required_error: "Data di scadenza obbligatoria" }),
+    docRilascio: z.string().min(1, "Data di rilascio obbligatoria"),
+    docScadenza: z.string().min(1, "Data di scadenza obbligatoria"),
     
     // Indirizzi
     resVia: z.string().min(1, "Via residenza obbligatoria"),
@@ -212,8 +212,8 @@ export default function CompileContract() {
       docTipo: "CARTA_IDENTITA" as const,
       docRilasciatoDa: "Comune" as const,
       docNumero: "",
-      docRilascio: new Date(),
-      docScadenza: new Date(),
+      docRilascio: "",
+      docScadenza: "",
       resVia: "",
       resCivico: "",
       resCitta: "",
@@ -341,11 +341,7 @@ export default function CompileContract() {
       if (parsed.codiceFiscale) setValue("codiceFiscale", parsed.codiceFiscale);
       if (parsed.numeroDocumento) setValue("docNumero", parsed.numeroDocumento);
       if (parsed.scadenza) {
-        try {
-          setValue("docScadenza", new Date(parsed.scadenza));
-        } catch {
-          // Invalid date format
-        }
+        setValue("docScadenza", parsed.scadenza);
       }
       
       setDocumentUploaded(true);
@@ -451,8 +447,8 @@ export default function CompileContract() {
           tipo: data.docTipo,
           numero: data.docNumero,
           rilasciatoDa: data.docRilasciatoDa,
-          dataRilascio: data.docRilascio.toISOString().split('T')[0],
-          dataScadenza: data.docScadenza.toISOString().split('T')[0]
+          dataRilascio: data.docRilascio,
+          dataScadenza: data.docScadenza
         },
         indirizzi: {
           residenza: {
@@ -775,23 +771,23 @@ export default function CompileContract() {
                   </div>
                   
                   <div>
-                    <Label>Data di rilascio *</Label>
-                    <DatePicker
-                      value={watch("docRilascio")}
-                      onChange={(date) => setValue("docRilascio", date || new Date())}
-                      placeholder="Seleziona data"
+                    <Label htmlFor="docRilascio">Data di rilascio *</Label>
+                    <Input
+                      id="docRilascio"
+                      type="date"
+                      {...register("docRilascio")}
                     />
                     {errors.docRilascio && (
                       <p className="text-sm text-red-600 mt-1">{errors.docRilascio.message}</p>
                     )}
                   </div>
-                  
+
                   <div>
-                    <Label>Data di scadenza *</Label>
-                    <DatePicker
-                      value={watch("docScadenza")}
-                      onChange={(date) => setValue("docScadenza", date || new Date())}
-                      placeholder="Seleziona data"
+                    <Label htmlFor="docScadenza">Data di scadenza *</Label>
+                    <Input
+                      id="docScadenza"
+                      type="date"
+                      {...register("docScadenza")}
                     />
                     {errors.docScadenza && (
                       <p className="text-sm text-red-600 mt-1">{errors.docScadenza.message}</p>
