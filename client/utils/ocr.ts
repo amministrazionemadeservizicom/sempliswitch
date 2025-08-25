@@ -3,7 +3,7 @@ import * as pdfjsLib from "pdfjs-dist";
 
 // @ts-ignore - serve per far caricare il worker di pdf.js in ambiente Vite/CRA
 (pdfjsLib as any).GlobalWorkerOptions.workerSrc =
-  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.5.136/pdf.worker.min.js";
+  "https://unpkg.com/pdfjs-dist@5.4.54/build/pdf.worker.min.js";
 
 let ocrWorker: Worker | null = null;
 
