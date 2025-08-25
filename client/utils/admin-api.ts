@@ -49,6 +49,41 @@ export const adminApi = {
     }
   },
 
+  // Update full contract using admin privileges
+  async updateContract(contractId: string, updateData: {
+    statoOfferta?: string;
+    noteStatoOfferta?: string;
+    contatto?: {
+      nome: string;
+      cognome: string;
+      codiceFiscale: string;
+    };
+    ragioneSociale?: string;
+  }) {
+    try {
+      const response = await fetch(`/.netlify/functions/admin-contracts?id=${contractId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'updateFull',
+          ...updateData
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error: any) {
+      console.error('❌ Error updating contract:', error);
+      throw error;
+    }
+  },
+
   // Delete contract using admin privileges
   async deleteContract(contractId: string) {
     try {
