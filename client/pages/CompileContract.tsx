@@ -545,7 +545,40 @@ export default function CompileContract() {
       setOcrLoading(false);
     }
   };
-  
+
+  // Handle bill photo capture (mobile only)
+  const handleBillCapture = async () => {
+    if (!isMobile) {
+      toast.error('Funzione disponibile solo su dispositivi mobili');
+      return;
+    }
+
+    clearError(); // Clear any previous camera errors
+
+    try {
+      const capturedFile = await capturePhoto();
+
+      if (capturedFile) {
+        console.log('📸 Foto fattura catturata:', capturedFile.name);
+
+        // Process the captured photo like a regular upload
+        const fileList = {
+          0: capturedFile,
+          length: 1,
+          item: (index: number) => index === 0 ? capturedFile : null,
+          [Symbol.iterator]: function* () {
+            yield capturedFile;
+          }
+        } as FileList;
+
+        await handleBillUpload(fileList);
+      }
+    } catch (error) {
+      console.error('❌ Errore cattura foto fattura:', error);
+      toast.error('Errore durante la cattura della foto della fattura');
+    }
+  };
+
   // Form submission
   const onSubmit = async (data: any) => {
     if (!documentUploaded) {
