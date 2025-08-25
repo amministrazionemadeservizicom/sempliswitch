@@ -1035,7 +1035,91 @@ export default function CompileContract() {
                       </div>
                     )}
                   </div>
-                  
+
+                  {/* Dati tecnici luce */}
+                  {selectedOffer?.commodity === "electricity" && (
+                    <div>
+                      <h4 className="font-medium mb-3">Dati fornitura luce</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="potenzaImpegnataKw">Potenza impegnata (kW) *</Label>
+                          <Input
+                            id="potenzaImpegnataKw"
+                            type="number"
+                            step="0.5"
+                            {...register("potenzaImpegnataKw", { valueAsNumber: true })}
+                            placeholder="3.0"
+                          />
+                          {errors.potenzaImpegnataKw && (
+                            <p className="text-sm text-red-600 mt-1">{errors.potenzaImpegnataKw.message}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dati tecnici gas */}
+                  {selectedOffer?.commodity === "gas" && (
+                    <div>
+                      <h4 className="font-medium mb-3">Dati fornitura gas</h4>
+                      <div>
+                        <Label className="text-sm font-medium mb-3 block">Usi del gas *</Label>
+                        <div className="flex flex-col sm:flex-row gap-4">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="uso-cottura"
+                              checked={watch("usiGas")?.includes("cottura") || false}
+                              onCheckedChange={(checked) => {
+                                const currentUsi = watch("usiGas") || [];
+                                if (checked) {
+                                  setValue("usiGas", [...currentUsi, "cottura"]);
+                                } else {
+                                  setValue("usiGas", currentUsi.filter(uso => uso !== "cottura"));
+                                }
+                              }}
+                            />
+                            <Label htmlFor="uso-cottura" className="text-sm">Cottura</Label>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="uso-riscaldamento"
+                              checked={watch("usiGas")?.includes("riscaldamento") || false}
+                              onCheckedChange={(checked) => {
+                                const currentUsi = watch("usiGas") || [];
+                                if (checked) {
+                                  setValue("usiGas", [...currentUsi, "riscaldamento"]);
+                                } else {
+                                  setValue("usiGas", currentUsi.filter(uso => uso !== "riscaldamento"));
+                                }
+                              }}
+                            />
+                            <Label htmlFor="uso-riscaldamento" className="text-sm">Riscaldamento</Label>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="uso-acqua-calda"
+                              checked={watch("usiGas")?.includes("acqua_calda") || false}
+                              onCheckedChange={(checked) => {
+                                const currentUsi = watch("usiGas") || [];
+                                if (checked) {
+                                  setValue("usiGas", [...currentUsi, "acqua_calda"]);
+                                } else {
+                                  setValue("usiGas", currentUsi.filter(uso => uso !== "acqua_calda"));
+                                }
+                              }}
+                            />
+                            <Label htmlFor="uso-acqua-calda" className="text-sm">Acqua calda</Label>
+                          </div>
+                        </div>
+                        {errors.usiGas && (
+                          <p className="text-sm text-red-600 mt-1">{errors.usiGas.message}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Residenziale radio (only if residential segment) */}
                   {selectedOffer?.segment === "residential" && (
                     <div>
