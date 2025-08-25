@@ -95,6 +95,13 @@ export default function AppLayout({
 
 
   const handleUserClick = () => {
+    console.log('👆 AppLayout: User clicked, checking localStorage...');
+    console.log('uid:', localStorage.getItem('uid'));
+    console.log('userName:', localStorage.getItem('userName'));
+    console.log('userRole:', localStorage.getItem('userRole'));
+    console.log('userEmail:', localStorage.getItem('userEmail'));
+    console.log('Current userFullName state:', userFullName);
+
     navigate('/profile');
   };
 
