@@ -181,13 +181,13 @@ export async function extractTextFromFiles(files: File[]) {
           previewsAll.push(...previewUrls);
         }
       }
-    })(), 45000);
+    })(), 25000); // Ridotto da 45s a 25s
 
     return { text: allText.trim(), pages, previews: previewsAll };
   } catch (error: any) {
     await safeTerminate();
     if (error.message?.includes("timeout")) {
-      throw new Error("OCR timeout: elaborazione troppo lenta. Riprova con immagini più piccole.");
+      throw new Error("OCR timeout: prova con immagini più piccole o meno file.");
     }
     throw error;
   }
