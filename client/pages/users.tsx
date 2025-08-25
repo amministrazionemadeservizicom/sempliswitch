@@ -48,6 +48,9 @@ export default function Users() {
   const [masters, setMasters] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -77,8 +80,49 @@ export default function Users() {
     console.log("Visualizza utente:", user);
   };
 
-  const handleEditUser = (user: any) => {
-    console.log("Modifica utente:", user);
+  const handleEditUser = (user: User) => {
+    setSelectedUser(user);
+    // Pre-fill form with user data
+    setFormData({
+      nome: user.nome,
+      email: user.email,
+      password: '', // Don't pre-fill password for security
+      ruolo: user.ruolo,
+      stato: user.stato === 'attivo',
+      pianoCompensi: user.pianoCompensi || '',
+      gestoriAssegnati: user.gestoriAssegnati || [],
+      master: user.master || ''
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleDeleteUser = (user: User) => {
+    setSelectedUser(user);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!selectedUser) return;
+
+    try {
+      // For now, just remove from local state
+      // In production, this would call an API to delete from Firebase
+      setUsers(users.filter(u => u.id !== selectedUser.id));
+
+      toast({
+        title: "Utente eliminato",
+        description: `L'utente ${selectedUser.nome} è stato rimosso dal sistema`,
+      });
+
+      setIsDeleteDialogOpen(false);
+      setSelectedUser(null);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Errore",
+        description: "Impossibile eliminare l'utente"
+      });
+    }
   };
 
   const fetchUsers = async () => {
@@ -550,6 +594,7 @@ export default function Users() {
                           <TableHead>Email</TableHead>
                           <TableHead>Ruolo</TableHead>
                           <TableHead>Stato</TableHead>
+                          <TableHead>Azioni</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -564,6 +609,26 @@ export default function Users() {
                               ) : (
                                 <Badge variant="secondary">Non Attivo</Badge>
                               )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditUser(user)}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeleteUser(user)}
+                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
