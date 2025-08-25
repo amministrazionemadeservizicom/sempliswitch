@@ -36,19 +36,26 @@ export async function processDocumentOCR(files: File[]): Promise<{
   parsed: ParsedFields;
   previews: string[];
 }> {
-  try {
-    // Create previews for all files
-    const previews = await Promise.all(
-      files.map(f => {
-        return new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(f);
-          reader.onload = () => resolve(reader.result as string);
-        });
-      })
-    );
+  // Create previews for all files first
+  const previews = await Promise.all(
+    files.map(f => {
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(f);
+        reader.onload = () => resolve(reader.result as string);
+      });
+    })
+  );
 
-    console.log('📤 Inviando documento a Netlify OCR...');
+  // Try Netlify OCR first
+  try {
+    console.log('📤 Tentativo OCR Netlify...');
+
+    // Test if endpoint is available
+    const isAvailable = await testNetlifyEndpoint();
+    if (!isAvailable) {
+      throw new Error('Netlify endpoint not available');
+    }
 
     // Prepare multipart form data
     const formData = new FormData();
@@ -56,11 +63,17 @@ export async function processDocumentOCR(files: File[]): Promise<{
       formData.append(`file${index}`, file);
     });
 
-    // Call Netlify function
+    // Call Netlify function with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
     const response = await fetch(OCR_ENDPOINT, {
       method: 'POST',
-      body: formData
+      body: formData,
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new Error(`OCR request failed: ${response.status} ${response.statusText}`);
@@ -82,21 +95,40 @@ export async function processDocumentOCR(files: File[]): Promise<{
       codiceFiscale: fields.codice_fiscale,
       numeroDocumento: fields.numero_documento,
       scadenza: fields.data_scadenza,
-      // Add other fields from Netlify response
       dataNascita: fields.data_nascita,
       luogoNascita: fields.luogo_nascita,
       conf: 0.8 // High confidence for Google Vision
     };
 
+    console.log('✅ OCR Netlify completato con successo');
     return {
       text: text || '',
       parsed,
       previews
     };
 
-  } catch (error) {
-    console.error('❌ Errore OCR Netlify:', error);
-    throw error;
+  } catch (netlifyError) {
+    console.warn('⚠️ OCR Netlify fallito, usando fallback locale:', netlifyError);
+
+    // Fallback to local Tesseract.js OCR
+    try {
+      console.log('📤 Usando OCR locale (Tesseract.js) come fallback...');
+
+      const { text } = await extractTextFromFiles(files);
+      const detectedType = detectDocType(text);
+      const parsed = parseFieldsByType(detectedType, text);
+
+      console.log('✅ OCR locale completato con successo');
+      return {
+        text: text || '',
+        parsed: { ...parsed, conf: 0.6 }, // Lower confidence for Tesseract
+        previews
+      };
+
+    } catch (fallbackError) {
+      console.error('❌ Errore anche nel fallback OCR locale:', fallbackError);
+      throw new Error(`OCR failed: Netlify (${netlifyError.message}) and local (${fallbackError.message})`);
+    }
   }
 }
 
