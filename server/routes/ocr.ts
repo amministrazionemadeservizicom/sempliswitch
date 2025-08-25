@@ -7,6 +7,74 @@ interface RequestWithFiles extends Request {
   files?: { [name: string]: fileUpload.UploadedFile | fileUpload.UploadedFile[] } | null | undefined;
 }
 
+// Local document parsing utilities
+type DocType = "CIE" | "CARTA_VECCHIA" | "PATENTE" | "PASSAPORTO" | "UNKNOWN";
+
+type ParsedFields = {
+  nome?: string;
+  cognome?: string;
+  dataNascita?: string;
+  luogoNascita?: string;
+  codiceFiscale?: string;
+  numeroDocumento?: string;
+  scadenza?: string;
+  iban?: string;
+  conf?: number;
+};
+
+function detectDocType(ocrText: string): DocType {
+  const t = ocrText.toUpperCase();
+  const hasMrzTd1 = /[\r\n]ID[A-Z0-9<]{25,}[\r\n][A-Z0-9<]{25,}[\r\n][A-Z0-9<]{25,}/.test(t);
+  const hasMrzTd3 = /[\r\n]P<.*/.test(t);
+  if (hasMrzTd1 || t.includes("CARTA D'IDENTIT") || t.includes("CARTA DI IDENTIT")) return "CIE";
+  if (hasMrzTd3 || t.includes("PASSAPORTO") || t.includes("PASSPORT")) return "PASSAPORTO";
+  if (t.includes("PATENTE DI GUIDA") || t.includes("DRIVING LICENCE")) return "PATENTE";
+  if (t.includes("COMUNE DI") || t.includes("RILASCIATA IL")) return "CARTA_VECCHIA";
+  return "UNKNOWN";
+}
+
+function toIsoDateLike(s?: string) {
+  if (!s) return undefined;
+  const m = s.replace(/[-.]/g,"/").match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (!m) return undefined;
+  const [ , d, mo, yRaw ] = m;
+  const y = Number(yRaw) < 100 ? (Number(yRaw) + 1900) : Number(yRaw);
+  const mm = String(mo).padStart(2,"0");
+  const dd = String(d).padStart(2,"0");
+  return `${y}-${mm}-${dd}`;
+}
+
+function parseFieldsByType(type: DocType, text: string): ParsedFields {
+  const t = text.replace(/\s+/g," ").trim();
+  const CF_RE = /\b([A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z])\b/;
+
+  // Basic parsing for all document types
+  const nome = (t.match(/NOME[:\s]+([A-ZÀ-Ù' -]+)/i)?.[1] || "").trim() || undefined;
+  const cognome = (t.match(/COGNOME[:\s]+([A-ZÀ-Ù' -]+)/i)?.[1] || "").trim() || undefined;
+  const dataNascita = toIsoDateLike(t.match(/NATO.*?(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i)?.[1]);
+  const scadenza = toIsoDateLike(t.match(/SCADENZA[:\s]+(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i)?.[1]);
+  const codiceFiscale = t.match(CF_RE)?.[1]?.toUpperCase();
+
+  let numeroDocumento;
+  if (type === "PATENTE") {
+    numeroDocumento = t.match(/N\.\s*PATENTE[:\s]*([A-Z0-9/-]+)/i)?.[1] || t.match(/\b([A-Z0-9]{8,})\b/)?.[1];
+  } else if (type === "PASSAPORTO") {
+    numeroDocumento = t.match(/N\.\s*PASSAPORTO[:\s]*([A-Z0-9/-]+)/i)?.[1];
+  } else {
+    numeroDocumento = t.match(/N\.\s*([A-Z0-9/-]+)/i)?.[1];
+  }
+
+  return {
+    nome,
+    cognome,
+    dataNascita,
+    scadenza,
+    numeroDocumento: numeroDocumento || undefined,
+    codiceFiscale,
+    conf: 0.6
+  };
+}
+
 // Initialize Google Cloud Vision client with credentials from environment
 let visionClient: ImageAnnotatorClient;
 
