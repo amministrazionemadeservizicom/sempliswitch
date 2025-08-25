@@ -40,12 +40,6 @@ export async function processDocumentOCR(files: File[]): Promise<{
   try {
     console.log('📤 Tentativo OCR Netlify...');
 
-    // Test if endpoint is available
-    const isAvailable = await testNetlifyEndpoint();
-    if (!isAvailable) {
-      throw new Error('Netlify endpoint not available');
-    }
-
     // Prepare multipart form data
     const formData = new FormData();
     files.forEach((file, index) => {
@@ -54,7 +48,7 @@ export async function processDocumentOCR(files: File[]): Promise<{
 
     // Call Netlify function with timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
     const response = await fetch(OCR_ENDPOINT, {
       method: 'POST',
