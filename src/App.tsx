@@ -73,7 +73,18 @@ const App = () => {
             />
 
             {/* Users (protetta) */}
-            {userRole === "admin" && <Route path="/users" element={<Users />} />}
+            <Route
+              path="/users"
+              element={
+                userRole === "admin" ? (
+                  <Users />
+                ) : (
+                  <p style={{ padding: "2rem", fontSize: 18, color: "red" }}>
+                    Accesso negato: questa pagina è riservata agli admin.
+                  </p>
+                )
+              }
+            />
 
             {/* Create user (protetta) */}
             <Route
