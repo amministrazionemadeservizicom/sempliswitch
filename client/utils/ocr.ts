@@ -157,11 +157,19 @@ async function extractFromImage(file: File) {
   return { text: result.text, previewUrls: [url] };
 }
 
-// 🔥 Funzione principale
+// 🔥 Funzione principale ottimizzata
 export async function extractTextFromFiles(files: File[]) {
   const pages: { filename: string; page: number; text: string; previewUrl: string }[] = [];
   const previewsAll: string[] = [];
   let allText = "";
+
+  // Controllo dimensione file (max 5MB per file)
+  const maxFileSize = 5 * 1024 * 1024; // 5MB
+  for (const file of files) {
+    if (file.size > maxFileSize) {
+      throw new Error(`File "${file.name}" troppo grande (${Math.round(file.size/1024/1024)}MB). Massimo 5MB per file.`);
+    }
+  }
 
   try {
     await runWithTimeout((async () => {
