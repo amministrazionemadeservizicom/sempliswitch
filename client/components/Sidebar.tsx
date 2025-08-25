@@ -44,6 +44,7 @@ const menuItems: MenuItem[] = [
   { id: "admin-offers", label: "Gestione Offerte", icon: Zap, href: "/AdminOffers", roles: ["admin"] },
   { id: "reports", label: "Report", icon: BarChart3, href: "/reports", roles: ["admin", "master"] },
   { id: "settings", label: "Configurazioni", icon: Settings, href: "/settings", roles: ["admin"] },
+  { id: "profile", label: "Il Mio Profilo", icon: User, href: "/profile", roles: ["consulente", "backoffice", "admin", "master"] },
 ];
 
 interface SidebarProps {
