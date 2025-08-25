@@ -66,6 +66,14 @@ export default function Contracts() {
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [noteText, setNoteText] = useState('');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingContract, setEditingContract] = useState<Contract | null>(null);
+  const [editContractData, setEditContractData] = useState({
+    statoOfferta: '' as Contract['statoOfferta'],
+    noteStatoOfferta: '',
+    contatto: { nome: '', cognome: '', codiceFiscale: '' },
+    ragioneSociale: ''
+  });
 
   useEffect(() => {
     const runFirebaseTest = async () => {
