@@ -41,8 +41,17 @@ export async function processDocumentOCR(files: File[]): Promise<{
 
   try {
     const { text } = await extractTextFromFiles(files);
+
+    console.log('📄 Testo grezzo estratto dall\'OCR:');
+    console.log('---START TEXT---');
+    console.log(text);
+    console.log('---END TEXT---');
+
     const detectedType = detectDocType(text);
+    console.log('🔍 Tipo documento rilevato:', detectedType);
+
     const parsed = parseFieldsByType(detectedType, text);
+    console.log('📋 Campi parsati:', parsed);
 
     console.log('✅ OCR locale completato con successo');
     return {
