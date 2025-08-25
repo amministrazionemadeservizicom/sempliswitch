@@ -138,6 +138,8 @@ export default function Contracts() {
       }
     };
 
+    // Run Firebase test first, then fetch contracts
+    runFirebaseTest();
     fetchContracts();
   }, []);
 
