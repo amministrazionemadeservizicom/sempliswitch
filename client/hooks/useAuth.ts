@@ -15,16 +15,34 @@ export function useAuth(): AuthReturn {
   const [userData, setUserData] = useState<any>(null);
 
   useEffect(() => {
-    // First, try to get role from localStorage for immediate use
+    // First, try to get data from localStorage for immediate use
     const storedRole = localStorage.getItem("userRole");
     const storedUID = localStorage.getItem("uid");
+    const storedUserName = localStorage.getItem("userName");
 
-    if (storedRole) {
+    if (storedRole && storedUID) {
+      // Create a user object from localStorage data
+      const localUser = {
+        uid: storedUID,
+        email: localStorage.getItem("userEmail") || '',
+        displayName: storedUserName || 'Utente'
+      };
+
+      setUser(localUser);
       setUserRole(storedRole);
+      setUserData({
+        uid: storedUID,
+        ruolo: storedRole,
+        nome: storedUserName?.split(' ')[0] || '',
+        cognome: storedUserName?.split(' ')[1] || '',
+        fullName: storedUserName || 'Utente'
+      });
     }
 
+    // Only try Firebase if we don't have localStorage data or to sync updates
     const unsubscribe = onAuthStateChanged(getAuth(), async (firebaseUser) => {
       if (firebaseUser) {
+        // Update with Firebase user if available
         setUser(firebaseUser);
 
         try {
@@ -41,23 +59,34 @@ export function useAuth(): AuthReturn {
             if (firebaseRole !== storedRole) {
               localStorage.setItem("userRole", firebaseRole);
             }
+            if (data.fullName && data.fullName !== storedUserName) {
+              localStorage.setItem("userName", data.fullName);
+            }
           } else {
-            // Firebase doc doesn't exist, use localStorage role if available
-            const fallbackRole = storedRole || "consulente";
-            setUserRole(fallbackRole);
-            setUserData({ uid: firebaseUser.uid, ruolo: fallbackRole });
+            // Firebase doc doesn't exist, keep localStorage data if available
+            if (!storedRole || !storedUID) {
+              // Only clear if we don't have localStorage fallback
+              setUser(null);
+              setUserRole(null);
+              setUserData(null);
+            }
           }
         } catch (error) {
           console.error("Error fetching user data from Firebase:", error);
-          // Fallback to localStorage role on Firebase error
-          const fallbackRole = storedRole || "consulente";
-          setUserRole(fallbackRole);
-          setUserData({ uid: firebaseUser.uid, ruolo: fallbackRole });
+          // Keep localStorage data on Firebase error if available
+          if (!storedRole || !storedUID) {
+            setUser(null);
+            setUserRole(null);
+            setUserData(null);
+          }
         }
       } else {
-        setUser(null);
-        setUserRole(null);
-        setUserData(null);
+        // Only clear if we don't have localStorage data
+        if (!storedRole || !storedUID) {
+          setUser(null);
+          setUserRole(null);
+          setUserData(null);
+        }
       }
     });
 
