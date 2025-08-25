@@ -1,0 +1,44 @@
+redirectsOrigin = "config"
+plugins = []
+functionsDirectory = "/Users/debbypalazzogmail.com/Downloads/glow-landing (4)/client/pages/netlify/functions"
+functionsDirectoryOrigin = "config-v1"
+headers = []
+
+[functions]
+
+[functions."*"]
+node_bundler = "esbuild"
+external_node_modules = ["express"]
+
+[build]
+publish = "/Users/debbypalazzogmail.com/Downloads/glow-landing (4)/client/pages/dist/spa"
+publishOrigin = "config"
+commandOrigin = "config"
+command = "npm run build:client"
+functions = "/Users/debbypalazzogmail.com/Downloads/glow-landing (4)/client/pages/netlify/functions"
+
+[build.environment]
+
+[build.processing]
+
+[build.processing.css]
+
+[build.processing.html]
+
+[build.processing.images]
+
+[build.processing.js]
+
+[build.services]
+
+[[redirects]]
+from = "/api/*"
+to = "/.netlify/functions/api/:splat"
+status = 200.0
+force = true
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
