@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 // Rimosso: ora usiamo Netlify OCR
 import { processDocumentOCR, processBillOCR } from "@/utils/netlify-ocr";
+import { useCamera } from "@/hooks/useCamera";
 
 // Regex patterns
 const CF_REGEX = /^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/;
