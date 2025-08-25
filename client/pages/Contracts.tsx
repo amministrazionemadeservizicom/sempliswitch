@@ -25,7 +25,7 @@ import {
   Calendar
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { testFirebaseConnection } from "@/utils/firebase-test";
+import { testFirebaseConnection } from "../utils/firebase-test";
 
 interface Contract {
   id: string;
