@@ -163,14 +163,14 @@ export default function Users() {
           id: doc.id,
           nome: `${data.nome || ''} ${data.cognome || ''}`.trim(),
           email: data.email || '',
-          ruolo: data.ruolo || 'consulente',
-          stato: data.attivo ? "attivo" : "non attivo",
+          ruolo: (data.ruolo as "admin" | "back office" | "consulente" | "master") || 'consulente',
+          stato: data.attivo ? "attivo" as const : "non attivo" as const,
           pianoCompensi: data.pianoCompensi || "",
           gestoriAssegnati: data.gestoriAssegnati || [],
           master: data.master || '',
           createdAt: data.createdAt || "",
           lastLogin: data.lastLogin || ""
-        };
+        } as User;
       });
 
       const cleanedUsers = usersFromFirebase.filter(user =>
