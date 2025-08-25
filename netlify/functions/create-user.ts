@@ -17,29 +17,26 @@ export default async (request: Request, context: Context) => {
       });
     }
 
-    // For now, we'll use a mock response since we need to set up Firebase Admin SDK
-    // In a real implementation, this would use Firebase Admin SDK to create the user
-    const mockUid = `user_${Date.now()}`;
-    
-    // Simulate user creation
-    const userData = {
-      uid: mockUid,
-      nome,
+    // Use Firebase Admin SDK to create the user
+    const { adminOperations } = await import('../../server/firebase-admin');
+
+    const userRecord = await adminOperations.createUserWithRole({
       email,
+      password,
+      nome,
       ruolo,
       stato: stato ? "attivo" : "non attivo",
       pianoCompensi: pianoCompensi || "",
       gestoriAssegnati: gestoriAssegnati || [],
-      master: master || "",
-      createdAt: new Date().toISOString()
-    };
+      masterRiferimento: master || ""
+    });
 
-    console.log("✅ Mock user created:", userData);
+    console.log("✅ Firebase user created:", userRecord.uid);
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      uid: mockUid,
-      message: "Utente creato con successo" 
+    return new Response(JSON.stringify({
+      success: true,
+      uid: userRecord.uid,
+      message: "Utente creato con successo tramite Firebase Admin"
     }), {
       status: 200,
       headers: { 
