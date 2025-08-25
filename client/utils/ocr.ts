@@ -46,35 +46,44 @@ async function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise(resolve => canvas.toBlob(b => resolve(b!), "image/png"));
 }
 
-// 🔥 Canvas preprocessing
+// 🔥 Canvas preprocessing ottimizzato per velocità
 function canvasFromImage(file: File): Promise<HTMLCanvasElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
-    
+
     img.onload = () => {
       URL.revokeObjectURL(url);
-      const c = document.createElement('canvas');
-      c.width = img.width * 2;
-      c.height = img.height * 2;
-      const ctx = c.getContext('2d')!;
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(img, 0, 0, c.width, c.height);
 
-      // grayscale + threshold
-      const id = ctx.getImageData(0, 0, c.width, c.height);
-      const d = id.data;
-      let sum = 0;
-      for (let i = 0; i < d.length; i += 4) sum += (d[i] + d[i+1] + d[i+2]) / 3;
-      const global = sum / (d.length / 4);
-      const thr = Math.max(100, Math.min(180, global));
+      // Calcola dimensioni ottimali (max 1200px per lato)
+      const maxSize = 1200;
+      let { width, height } = img;
 
-      for (let i = 0; i < d.length; i += 4) {
-        const gray = (d[i] + d[i+1] + d[i+2]) / 3;
-        const bw = gray > thr ? 255 : 0;
-        d[i] = d[i+1] = d[i+2] = bw;
+      if (width > maxSize || height > maxSize) {
+        const ratio = Math.min(maxSize / width, maxSize / height);
+        width = Math.floor(width * ratio);
+        height = Math.floor(height * ratio);
       }
+
+      const c = document.createElement('canvas');
+      c.width = width;
+      c.height = height;
+      const ctx = c.getContext('2d')!;
+
+      // Disegna immagine ridimensionata
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Preprocessing semplificato per velocità
+      const id = ctx.getImageData(0, 0, width, height);
+      const d = id.data;
+
+      // Contrasto semplice senza threshold complesso
+      for (let i = 0; i < d.length; i += 4) {
+        const gray = Math.round((d[i] + d[i+1] + d[i+2]) / 3);
+        const enhanced = gray > 128 ? Math.min(255, gray + 30) : Math.max(0, gray - 30);
+        d[i] = d[i+1] = d[i+2] = enhanced;
+      }
+
       ctx.putImageData(id, 0, 0);
       resolve(c);
     };
