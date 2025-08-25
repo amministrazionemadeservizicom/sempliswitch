@@ -30,7 +30,7 @@ import {
   Save,
   AlertCircle,
 } from "lucide-react";
-import { extractTextFromFiles, terminateOcrWorker } from "@/utils/ocr";
+// Rimosso: ora usiamo Netlify OCR
 import { detectDocType, parseFieldsByType } from "@/utils/id-parsers";
 // import { extractDocumentData, extractBillData, isGoogleOCRAvailable } from "../utils/google-ocr";
 
