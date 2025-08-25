@@ -1,5 +1,7 @@
 import { detectDocType, parseFieldsByType, type ParsedFields } from './id-parsers';
 
+import { detectDocType, parseFieldsByType, type ParsedFields } from './id-parsers';
+
 const OCR_ENDPOINT = 'https://sempliswitch.it/.netlify/functions/ocr';
 
 // OCR for identity documents using Netlify Functions
