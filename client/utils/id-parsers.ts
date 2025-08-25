@@ -91,29 +91,73 @@ function extractCleanField(text: string, pattern: RegExp): string | undefined {
 
 // Parser CIE (solo da testo OCR + MRZ semplificata)
 export function parseCIE(text: string): ParsedFields {
+  // Split text into lines to handle multiline format
+  const lines = text.split(/[\r\n]+/).map(line => line.trim());
   const t = text.replace(/\s+/g," ").trim();
 
-  // Try multiple patterns for different CIE layouts
-  let nome, cognome, scadenza, numeroDocumento, dataNascita, luogoNascita;
+  console.log('🔍 Parsing CIE text:', t);
 
-  // Pattern 1: Standard CIE format with COGNOME / SURNAME and NOME / NAME
-  const cognomeMatch = t.match(/COGNOME\s*\/\s*SURNAME[:\s]*([A-ZÀ-Ù' -]+)(?=\s*NOME|\/|$)/i);
-  const nomeMatch = t.match(/NOME\s*\/\s*NAME[:\s]*([A-ZÀ-Ù' -]+)(?=\s*LUOGO|SESSO|\/|$)/i);
+  let nome, cognome, scadenza, numeroDocumento, dataNascita, luogoNascita, emissione;
 
-  if (cognomeMatch) cognome = cognomeMatch[1].trim();
-  if (nomeMatch) nome = nomeMatch[1].trim();
+  // NEW: Parse multiline format where labels and values are on separate lines
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const nextLine = lines[i + 1] || '';
 
-  // Pattern 2: Fallback to simple COGNOME/NOME without English
-  if (!cognome) {
-    cognome = extractCleanField(t, /\bCOGNOME[:\s]*([A-ZÀ-Ù' -]+)/i);
+    // COGNOME / SURNAME pattern - value on next line
+    if (/COGNOME\s*\/\s*SURNAME/i.test(line) && !cognome) {
+      const valueMatch = nextLine.match(/^([A-ZÀ-Ù' -]+)/);
+      if (valueMatch) {
+        cognome = valueMatch[1].trim();
+        console.log('📝 Found cognome:', cognome);
+      }
+    }
+
+    // NOME / NAME pattern - value on next line
+    if (/NOME\s*\/\s*NAME/i.test(line) && !nome) {
+      const valueMatch = nextLine.match(/^([A-ZÀ-Ù' -]+)/);
+      if (valueMatch) {
+        nome = valueMatch[1].trim();
+        console.log('📝 Found nome:', nome);
+      }
+    }
+
+    // SCADENZA / EXPIRY pattern - value on next line
+    if (/SCADENZA\s*\/\s*EXPIRY/i.test(line) && !scadenza) {
+      const dateMatch = nextLine.match(/(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/);
+      if (dateMatch) {
+        scadenza = toIsoDateLike(dateMatch[1]);
+        console.log('📝 Found scadenza:', scadenza);
+      }
+    }
+
+    // EMISSIONE / ISSUING pattern - value on next line
+    if (/EMISSIONE\s*\/\s*ISSUING/i.test(line) && !emissione) {
+      const dateMatch = nextLine.match(/(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/);
+      if (dateMatch) {
+        emissione = toIsoDateLike(dateMatch[1]);
+        console.log('📝 Found emissione:', emissione);
+      }
+    }
   }
+
+  // Fallback: try single-line patterns
+  if (!cognome) {
+    const cognomeMatch = t.match(/COGNOME\s*\/\s*SURNAME[:\s]*([A-ZÀ-Ù' -]+)(?=\s*NOME|\/|$)/i);
+    if (cognomeMatch) cognome = cognomeMatch[1].trim();
+  }
+
   if (!nome) {
-    nome = extractCleanField(t, /\bNOME[:\s]*([A-ZÀ-Ù' -]+)/i);
+    const nomeMatch = t.match(/NOME\s*\/\s*NAME[:\s]*([A-ZÀ-Ù' -]+)(?=\s*LUOGO|SESSO|\/|$)/i);
+    if (nomeMatch) nome = nomeMatch[1].trim();
   }
 
   // Extract document number (format like CA89525IB)
   const docNumMatch = t.match(/\b([A-Z]{2}\d{5}[A-Z]{1,2})\b/) || t.match(/N\.[\s]*([A-Z0-9]{6,12})/i);
-  if (docNumMatch) numeroDocumento = docNumMatch[1];
+  if (docNumMatch) {
+    numeroDocumento = docNumMatch[1];
+    console.log('📝 Found numeroDocumento:', numeroDocumento);
+  }
 
   // Extract birth date and place
   const birthMatch = t.match(/(?:LUOGO E DATA DI NASCITA|PLACE AND DATE OF BIRTH)[\s\/]*:?[\s]*([A-ZÀ-Ù' \(\)]+)[\s]+(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/i);
@@ -122,16 +166,27 @@ export function parseCIE(text: string): ParsedFields {
     dataNascita = toIsoDateLike(birthMatch[2]);
   }
 
-  // Fallback for birth date only
+  // Fallback for birth date extraction
   if (!dataNascita) {
-    dataNascita = toIsoDateLike(t.match(/(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/)?.[1]);
+    // Look for date patterns, but avoid scadenza/emissione dates
+    const allDates = [...t.matchAll(/(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/g)];
+    const scadenzaText = scadenza ? scadenza.replace(/[-]/g, '.') : '';
+    const emissioneText = emissione ? emissione.replace(/[-]/g, '.') : '';
+
+    for (const dateMatch of allDates) {
+      const dateStr = dateMatch[1];
+      const normalizedDate = dateStr.replace(/[\.\/-]/g, '.');
+
+      // Skip if this is scadenza or emissione date
+      if (scadenzaText && normalizedDate === scadenzaText.replace(/[-]/g, '.')) continue;
+      if (emissioneText && normalizedDate === emissioneText.replace(/[-]/g, '.')) continue;
+
+      dataNascita = toIsoDateLike(dateStr);
+      break;
+    }
   }
 
-  // Extract expiry date
-  const expiryMatch = t.match(/(?:SCADENZA|EXPIRY)[\s\/]*:?[\s]*(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/i);
-  if (expiryMatch) scadenza = toIsoDateLike(expiryMatch[1]);
-
-  // Extract fiscal code
+  // Extract fiscal code from anywhere in text
   const cf = t.match(CF_RE)?.[1];
 
   // MRZ parsing as fallback
@@ -146,6 +201,8 @@ export function parseCIE(text: string): ParsedFields {
       nome = nameParts[1].replace(/</g, ' ').trim();
     }
   }
+
+  console.log('✅ CIE parsing result:', { nome, cognome, scadenza, numeroDocumento, dataNascita, emissione });
 
   return {
     nome,
