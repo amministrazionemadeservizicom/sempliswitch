@@ -728,14 +728,30 @@ export default function CompileContract() {
                     <p className="text-sm text-gray-500">
                       PDF, JPG o PNG - Accetta più file
                     </p>
-                    <Button
-                      type="button"
-                      onClick={() => document.getElementById("doc-upload")?.click()}
-                      className="mt-2"
-                      style={{ backgroundColor: '#F2C927', color: '#333' }}
-                    >
-                      Seleziona File
-                    </Button>
+                    <div className="flex flex-col sm:flex-row gap-2 mt-2 justify-center">
+                      <Button
+                        type="button"
+                        onClick={() => document.getElementById("doc-upload")?.click()}
+                        style={{ backgroundColor: '#F2C927', color: '#333' }}
+                        disabled={ocrLoading || isCapturing}
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Seleziona File
+                      </Button>
+
+                      {isMobile && (
+                        <Button
+                          type="button"
+                          onClick={handleDocumentCapture}
+                          variant="outline"
+                          disabled={ocrLoading || isCapturing}
+                          className="border-[#F2C927] text-[#333] hover:bg-[#F2C927] hover:text-[#333]"
+                        >
+                          <Camera className="h-4 w-4 mr-2" />
+                          {isCapturing ? 'Scattando...' : 'Scatta Foto'}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
                 
