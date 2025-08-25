@@ -257,20 +257,74 @@ export default function Contracts() {
     }
   };
 
-  const handleUpdateNote = () => {
+  const handleUpdateNote = async () => {
     if (selectedContract) {
-      setContracts(contracts.map(c => 
-        c.id === selectedContract.id 
-          ? { ...c, noteStatoOfferta: noteText }
-          : c
-      ));
-      toast({
-        title: "Note aggiornate",
-        description: "Le note del contratto sono state salvate",
-      });
-      setIsNoteModalOpen(false);
-      setSelectedContract(null);
-      setNoteText('');
+      try {
+        await adminApi.updateContractStatus(
+          selectedContract.id,
+          selectedContract.statoOfferta,
+          noteText
+        );
+        setContracts(contracts.map(c =>
+          c.id === selectedContract.id
+            ? { ...c, noteStatoOfferta: noteText }
+            : c
+        ));
+        toast({
+          title: "Note aggiornate",
+          description: "Le note del contratto sono state salvate",
+        });
+        setIsNoteModalOpen(false);
+        setSelectedContract(null);
+        setNoteText('');
+      } catch (error: any) {
+        console.error('Error updating notes:', error);
+        toast({
+          variant: "destructive",
+          title: "Errore",
+          description: "Impossibile aggiornare le note",
+        });
+      }
+    }
+  };
+
+  const handleUpdateContract = async () => {
+    if (editingContract) {
+      try {
+        await adminApi.updateContract(editingContract.id, {
+          statoOfferta: editContractData.statoOfferta,
+          noteStatoOfferta: editContractData.noteStatoOfferta,
+          contatto: editContractData.contatto,
+          ragioneSociale: editContractData.ragioneSociale
+        });
+
+        setContracts(contracts.map(c =>
+          c.id === editingContract.id
+            ? {
+                ...c,
+                statoOfferta: editContractData.statoOfferta,
+                noteStatoOfferta: editContractData.noteStatoOfferta,
+                contatto: editContractData.contatto,
+                ragioneSociale: editContractData.ragioneSociale
+              }
+            : c
+        ));
+
+        toast({
+          title: "Contratto aggiornato",
+          description: "Le modifiche sono state salvate con successo",
+        });
+
+        setIsEditModalOpen(false);
+        setEditingContract(null);
+      } catch (error: any) {
+        console.error('Error updating contract:', error);
+        toast({
+          variant: "destructive",
+          title: "Errore",
+          description: "Impossibile aggiornare il contratto",
+        });
+      }
     }
   };
 
