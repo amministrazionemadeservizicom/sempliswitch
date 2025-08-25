@@ -28,16 +28,20 @@ try {
 
 // Helper function to extract text from image buffer
 async function extractTextFromBuffer(buffer: Buffer): Promise<string> {
+  if (!visionClient) {
+    throw new Error("Google Cloud Vision is not properly configured");
+  }
+
   try {
     const [result] = await visionClient.textDetection({
       image: { content: buffer }
     });
-    
+
     const detections = result.textAnnotations;
     if (!detections || detections.length === 0) {
       throw new Error("No text detected in image");
     }
-    
+
     return detections[0]?.description || "";
   } catch (error) {
     console.error("Google Vision OCR error:", error);
