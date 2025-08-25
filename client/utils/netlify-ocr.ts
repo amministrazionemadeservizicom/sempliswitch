@@ -184,7 +184,15 @@ export async function processBillOCR(files: File[]): Promise<{
     };
 
   } catch (netlifyError) {
-    console.warn('⚠️ OCR Netlify fattura fallito, usando fallback locale:', netlifyError);
+    // Log specific error types for debugging
+    const errorMsg = netlifyError.message || 'Unknown error';
+    if (errorMsg.includes('Failed to fetch')) {
+      console.warn('⚠️ OCR Netlify fattura: errore di rete (Failed to fetch), usando fallback locale');
+    } else if (errorMsg.includes('AbortError')) {
+      console.warn('⚠️ OCR Netlify fattura: timeout, usando fallback locale');
+    } else {
+      console.warn('⚠️ OCR Netlify fattura fallito:', errorMsg, ', usando fallback locale');
+    }
 
     // Fallback to local Tesseract.js OCR
     try {
@@ -193,7 +201,7 @@ export async function processBillOCR(files: File[]): Promise<{
       const { text } = await extractTextFromFiles(files);
       const billData = parseBillData(text);
 
-      console.log('�� OCR locale fattura completato con successo');
+      console.log('✅ OCR locale fattura completato con successo');
       return {
         text: text || '',
         data: billData,
@@ -202,7 +210,7 @@ export async function processBillOCR(files: File[]): Promise<{
 
     } catch (fallbackError) {
       console.error('❌ Errore anche nel fallback OCR locale per fattura:', fallbackError);
-      throw new Error(`Bill OCR failed: Netlify (${netlifyError.message}) and local (${fallbackError.message})`);
+      throw new Error(`Bill OCR failed: Netlify (${errorMsg}) and local (${fallbackError.message})`);
     }
   }
 }
