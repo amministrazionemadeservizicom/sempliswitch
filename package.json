@@ -11,8 +11,9 @@
     ]
   },
   "scripts": {
-    "dev": "netlify dev",
+    "dev": "netlify dev --offline",
     "dev:vite": "vite",
+    "dev:local": "vite",
     "dev:functions": "netlify functions:serve",
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build",
