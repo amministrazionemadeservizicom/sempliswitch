@@ -1019,34 +1019,39 @@ export default function CompileContract() {
                   )}
                   
                   {/* POD/PDR */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {selectedOffer?.commodity === "electricity" && (
-                      <div>
-                        <Label htmlFor="pod">POD *</Label>
-                        <Input
-                          id="pod"
-                          {...register("pod")}
-                          placeholder="IT123E45678901234567890"
-                        />
-                        {errors.pod && (
-                          <p className="text-sm text-red-600 mt-1">{errors.pod.message}</p>
-                        )}
-                      </div>
-                    )}
-                    
-                    {selectedOffer?.commodity === "gas" && (
-                      <div>
-                        <Label htmlFor="pdr">PDR *</Label>
-                        <Input
-                          id="pdr"
-                          {...register("pdr")}
-                          placeholder="12345678901234"
-                        />
-                        {errors.pdr && (
-                          <p className="text-sm text-red-600 mt-1">{errors.pdr.message}</p>
-                        )}
-                      </div>
-                    )}
+                  <div>
+                    <h4 className="font-medium mb-3">Codici di fornitura</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {(selectedOffer?.commodity === "electricity" || !selectedOffer?.commodity) && (
+                        <div>
+                          <Label htmlFor="pod">POD {selectedOffer?.commodity === "electricity" ? "*" : ""}</Label>
+                          <Input
+                            id="pod"
+                            {...register("pod")}
+                            placeholder="IT123E45678901234567890"
+                          />
+                          {errors.pod && (
+                            <p className="text-sm text-red-600 mt-1">{errors.pod.message}</p>
+                          )}
+                          <p className="text-xs text-gray-500 mt-1">Codice per fornitura elettrica</p>
+                        </div>
+                      )}
+
+                      {(selectedOffer?.commodity === "gas" || !selectedOffer?.commodity) && (
+                        <div>
+                          <Label htmlFor="pdr">PDR {selectedOffer?.commodity === "gas" ? "*" : ""}</Label>
+                          <Input
+                            id="pdr"
+                            {...register("pdr")}
+                            placeholder="12345678901234"
+                          />
+                          {errors.pdr && (
+                            <p className="text-sm text-red-600 mt-1">{errors.pdr.message}</p>
+                          )}
+                          <p className="text-xs text-gray-500 mt-1">Codice per fornitura gas</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Dati tecnici luce */}
