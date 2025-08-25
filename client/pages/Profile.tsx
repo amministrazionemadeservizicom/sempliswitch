@@ -205,11 +205,12 @@ export default function Profile() {
   };
 
   const handleSaveProfile = async () => {
-    if (!currentUser?.uid || !formData) return;
+    const uid = currentUser?.uid || localStorage.getItem('uid');
+    if (!uid || !formData) return;
 
     try {
       setSaving(true);
-      
+
       // Update fullName if nome or cognome changed
       const updatedFormData = {
         ...formData,
@@ -217,7 +218,7 @@ export default function Profile() {
         lastUpdated: new Date().toISOString()
       };
 
-      await updateDoc(doc(db, "utenti", currentUser.uid), updatedFormData);
+      await updateDoc(doc(db, "utenti", uid), updatedFormData);
       
       // Update localStorage
       localStorage.setItem("userName", updatedFormData.fullName || '');
