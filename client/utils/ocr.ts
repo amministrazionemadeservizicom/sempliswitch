@@ -214,19 +214,8 @@ export async function extractTextFromFiles(files: File[]) {
         const ext = (file.name.split(".").pop() || "").toLowerCase();
 
         if (ext === "pdf") {
-          console.log('📋 Processing PDF...');
-          try {
-            const { text, previewUrls } = await extractFromPDF(file);
-            console.log('📋 PDF text length:', text.length);
-            allText += `\n\n=== ${file.name} ===\n${text}`;
-            previewUrls.forEach((url, idx) => {
-              pages.push({ filename: file.name, page: idx + 1, text: "", previewUrl: url });
-            });
-            previewsAll.push(...previewUrls);
-          } catch (pdfError) {
-            console.warn('⚠️ PDF processing failed, try converting to images:', pdfError);
-            throw new Error(`Errore elaborazione PDF "${file.name}". Prova a convertire in immagini JPG/PNG.`);
-          }
+          console.log('📋 PDF processing temporaneamente disabilitato');
+          throw new Error(`📄 Il file "${file.name}" è un PDF. Per ora carica solo immagini (JPG/PNG) del documento. Il processing PDF sarà riattivato quando il worker sarà stabile.`);
         } else {
           console.log('🖼️ Processing image...');
           const { text, previewUrls } = await extractFromImage(file);
