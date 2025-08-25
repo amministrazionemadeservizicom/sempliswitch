@@ -141,7 +141,7 @@ export async function saveContract({
 
     console.log("💾 Saving contract to Firebase:", cleanedContract);
 
-    const docRef = await addDoc(collection(db, "contratti"), cleanedContract);
+    const docRef = await addDoc(collection(db, "contracts"), cleanedContract);
     
     console.log("✅ Contract saved successfully with ID:", docRef.id);
     
