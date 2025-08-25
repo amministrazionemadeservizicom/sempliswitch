@@ -84,10 +84,11 @@ export default function AppLayout({
       {/* Desktop Sidebar */}
       <Sidebar
         userRole={userRole}
-      isCollapsed={sidebarCollapsed}
-      onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-      userFullName={userFullName}  // 👈 passa il nome/cognome alla Sidebar
-       />
+        isCollapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        userFullName={userFullName}
+        onUserClick={handleUserClick}
+      />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
