@@ -1,8 +1,12 @@
 import express from "express";
 import cors from "cors";
 import fileUpload from "express-fileupload";
+import dotenv from "dotenv";
 import { handleDemo } from "./routes/demo";
 import { handleDocumentOCR, handleBillOCR } from "./routes/ocr";
+
+// Load environment variables
+dotenv.config();
 
 export function createServer() {
   const app = express();
