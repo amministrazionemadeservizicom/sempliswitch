@@ -138,19 +138,26 @@ export async function processBillOCR(files: File[]): Promise<{
   data: any;
   previews: string[];
 }> {
-  try {
-    // Create previews for all files
-    const previews = await Promise.all(
-      files.map(f => {
-        return new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(f);
-          reader.onload = () => resolve(reader.result as string);
-        });
-      })
-    );
+  // Create previews for all files first
+  const previews = await Promise.all(
+    files.map(f => {
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(f);
+        reader.onload = () => resolve(reader.result as string);
+      });
+    })
+  );
 
-    console.log('📤 Inviando fattura a Netlify OCR...');
+  // Try Netlify OCR first
+  try {
+    console.log('📤 Tentativo OCR Netlify per fattura...');
+
+    // Test if endpoint is available
+    const isAvailable = await testNetlifyEndpoint();
+    if (!isAvailable) {
+      throw new Error('Netlify endpoint not available');
+    }
 
     // Prepare multipart form data
     const formData = new FormData();
@@ -158,11 +165,17 @@ export async function processBillOCR(files: File[]): Promise<{
       formData.append(`file${index}`, file);
     });
 
-    // Call Netlify function
+    // Call Netlify function with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
     const response = await fetch(OCR_ENDPOINT, {
       method: 'POST',
-      body: formData
+      body: formData,
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new Error(`OCR request failed: ${response.status} ${response.statusText}`);
@@ -176,19 +189,36 @@ export async function processBillOCR(files: File[]): Promise<{
     }
 
     const { text } = result;
-
-    // Parse bill data from text (local parsing since Netlify doesn't do this)
     const billData = parseBillData(text);
 
+    console.log('✅ OCR Netlify fattura completato con successo');
     return {
       text: text || '',
       data: billData,
       previews
     };
 
-  } catch (error) {
-    console.error('❌ Errore OCR Netlify fattura:', error);
-    throw error;
+  } catch (netlifyError) {
+    console.warn('⚠️ OCR Netlify fattura fallito, usando fallback locale:', netlifyError);
+
+    // Fallback to local Tesseract.js OCR
+    try {
+      console.log('📤 Usando OCR locale (Tesseract.js) per fattura come fallback...');
+
+      const { text } = await extractTextFromFiles(files);
+      const billData = parseBillData(text);
+
+      console.log('✅ OCR locale fattura completato con successo');
+      return {
+        text: text || '',
+        data: billData,
+        previews
+      };
+
+    } catch (fallbackError) {
+      console.error('❌ Errore anche nel fallback OCR locale per fattura:', fallbackError);
+      throw new Error(`Bill OCR failed: Netlify (${netlifyError.message}) and local (${fallbackError.message})`);
+    }
   }
 }
 
