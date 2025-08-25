@@ -1,0 +1,19 @@
+[
+  {
+    "logo": "loghi/logo-iren.png",
+    "brand": "IREN",
+    "nomeOfferta": "🔵 IREN PRIMA SCELTA LUCE",
+    "tipoCliente": "Privato",
+    "tipoFornitura": "Luce",
+    "tipoOfferta": "Prezzo Fisso",
+    "note": "",
+    "tipologia": [
+      "Switch"
+    ],
+    "prezzo": "0.099 EUR/kWh",
+    "ccv": "10.00 EUR al mese",
+    "modalitaPagamento": "Solo Rid",
+    "disponibile": "no",
+    "dettagli": ""
+  }
+]

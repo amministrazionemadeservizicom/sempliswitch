@@ -1,0 +1,36 @@
+[
+  {
+    "logo": "loghi/logo-pulsee.png",
+    "brand": "PULSEE",
+    "nomeOfferta": "PULSEE Partner Luce Index",
+    "tipoCliente": "Privato",
+    "tipoFornitura": "Luce",
+    "tipoOfferta": "Prezzo Variabile",
+    "note": "",
+    "tipologia": [
+      "Switch"
+    ],
+    "prezzo": "PUN + 0.023 EUR/kWh",
+    "ccv": "12.00 EUR al mese",
+    "modalitaPagamento": "RID e Bollettino",
+    "disponibile": "no",
+    "dettagli": ""
+  },
+  {
+    "logo": "loghi/logo-pulsee.png",
+    "brand": "PULSEE",
+    "nomeOfferta": "Pulsee Value Luce Fix",
+    "tipoCliente": "Privato",
+    "tipoFornitura": "Luce",
+    "tipoOfferta": "Prezzo Fisso",
+    "note": "",
+    "tipologia": [
+      "Switch"
+    ],
+    "prezzo": "0.173 EUR/kWh",
+    "ccv": "12.00 EUR al mese",
+    "modalitaPagamento": "RID e Bollettino",
+    "disponibile": "no",
+    "dettagli": ""
+  }
+]

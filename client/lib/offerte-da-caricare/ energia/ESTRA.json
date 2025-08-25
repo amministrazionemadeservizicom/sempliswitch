@@ -1,0 +1,53 @@
+[
+  {
+    "logo": "loghi/logo-estra.png",
+    "brand": "ESTRA",
+    "nomeOfferta": "ESTRA FISSA LUCE",
+    "tipoCliente": "Privato",
+    "tipoFornitura": "Luce",
+    "tipoOfferta": "Prezzo Fisso",
+    "note": "",
+    "tipologia": [
+      "Switch"
+    ],
+    "prezzo": "0.166 EUR/kWh",
+    "ccv": "11.00 EUR al mese",
+    "modalitaPagamento": "RID e Bollettino",
+    "disponibile": "no",
+    "dettagli": ""
+  },
+  {
+    "logo": "loghi/logo-estra.png",
+    "brand": "ESTRA",
+    "nomeOfferta": "ESTRA NATURA LUCE",
+    "tipoCliente": "Privato",
+    "tipoFornitura": "Luce",
+    "tipoOfferta": "Prezzo Variabile",
+    "note": "",
+    "tipologia": [
+      "Switch"
+    ],
+    "prezzo": "PUN + 0.033 EUR/kWh",
+    "ccv": "11.00 EUR al mese",
+    "modalitaPagamento": "RID e Bollettino",
+    "disponibile": "no",
+    "dettagli": ""
+  },
+  {
+    "logo": "loghi/logo-estra.png",
+    "brand": "ESTRA",
+    "nomeOfferta": "ESTRA PROMO LUCE ",
+    "tipoCliente": "Privato",
+    "tipoFornitura": "Luce",
+    "tipoOfferta": "Prezzo Variabile",
+    "note": "",
+    "tipologia": [
+      "Switch"
+    ],
+    "prezzo": "PUN + 0.028 EUR/kWh",
+    "ccv": "7.66 EUR al mese",
+    "modalitaPagamento": "RID e Bollettino",
+    "disponibile": "no",
+    "dettagli": ""
+  }
+]

@@ -1,0 +1,53 @@
+[
+  {
+    "logo": "loghi/logo-acea.png",
+    "brand": "ACEA",
+    "nomeOfferta": "Acea Fix COMPARATORE CON ISTANT",
+    "tipoCliente": "Privato",
+    "tipoFornitura": "Luce",
+    "tipoOfferta": "Prezzo Fisso",
+    "note": "",
+    "tipologia": [
+      "Switch"
+    ],
+    "prezzo": "0.120 EUR/kWh",
+    "ccv": "12.00 EUR al mese",
+    "modalitaPagamento": "RID e Bollettino",
+    "disponibile": "no",
+    "dettagli": ""
+  },
+  {
+    "logo": "loghi/logo-acea.png",
+    "brand": "ACEA",
+    "nomeOfferta": "Acea Fix NEGOZIO Otp",
+    "tipoCliente": "Privato",
+    "tipoFornitura": "Luce",
+    "tipoOfferta": "Prezzo Fisso",
+    "note": "",
+    "tipologia": [
+      "Switch"
+    ],
+    "prezzo": "0.125 EUR/kWh",
+    "ccv": "12.00 EUR al mese",
+    "modalitaPagamento": "RID e Bollettino",
+    "disponibile": "no",
+    "dettagli": ""
+  },
+  {
+    "logo": "loghi/logo-acea.png",
+    "brand": "ACEA",
+    "nomeOfferta": "ACEA SPRINT NEGOZIO CON OTP",
+    "tipoCliente": "Privato",
+    "tipoFornitura": "Luce",
+    "tipoOfferta": "Prezzo Variabile",
+    "note": "",
+    "tipologia": [
+      "Switch"
+    ],
+    "prezzo": "PUN + 0.016 EUR/kWh",
+    "ccv": "10.00 EUR al mese",
+    "modalitaPagamento": "RID e Bollettino",
+    "disponibile": "no",
+    "dettagli": ""
+  }
+]

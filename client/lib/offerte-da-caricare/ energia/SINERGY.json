@@ -1,0 +1,19 @@
+[
+  {
+    "logo": "loghi/logo-sinergy.png",
+    "brand": "SINERGY",
+    "nomeOfferta": "Sinergy Family Luce",
+    "tipoCliente": "Privato",
+    "tipoFornitura": "Luce",
+    "tipoOfferta": "Prezzo Variabile",
+    "note": "",
+    "tipologia": [
+      "Switch"
+    ],
+    "prezzo": "PUN + 0.021 EUR/kWh",
+    "ccv": "12.00 EUR al mese",
+    "modalitaPagamento": "RID e Bollettino",
+    "disponibile": "no",
+    "dettagli": ""
+  }
+]

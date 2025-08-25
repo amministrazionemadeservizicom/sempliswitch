@@ -1,0 +1,19 @@
+[
+  {
+    "logo": "loghi/logo-a2a.png",
+    "brand": "A2A",
+    "nomeOfferta": "A2A Bonus 10 Luce",
+    "tipoCliente": "Privato",
+    "tipoFornitura": "Luce",
+    "tipoOfferta": "Prezzo Variabile",
+    "note": "",
+    "tipologia": [
+      "Switch"
+    ],
+    "prezzo": "PUN + 0.025 EUR/kWh",
+    "ccv": "9.50 EUR al mese",
+    "modalitaPagamento": "RID e Bollettino",
+    "disponibile": "no",
+    "dettagli": ""
+  }
+]

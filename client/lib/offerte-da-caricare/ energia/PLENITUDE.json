@@ -1,0 +1,19 @@
+[
+  {
+    "logo": "loghi/logo-plenitude.png",
+    "brand": "PLENITUDE",
+    "nomeOfferta": "PLENITUDE FIXA TIME LUCE",
+    "tipoCliente": "Privato",
+    "tipoFornitura": "Luce",
+    "tipoOfferta": "Prezzo Fisso",
+    "note": "",
+    "tipologia": [
+      "Switch"
+    ],
+    "prezzo": "0.127 EUR/kWh",
+    "ccv": "12.00 EUR al mese",
+    "modalitaPagamento": "RID e Bollettino",
+    "disponibile": "no",
+    "dettagli": ""
+  }
+]

@@ -1,0 +1,53 @@
+[
+  {
+    "logo": "loghi/logo-edison.png",
+    "brand": "EDISON",
+    "nomeOfferta": "EDISON WORLD LUCE",
+    "tipoCliente": "Privato",
+    "tipoFornitura": "Luce",
+    "tipoOfferta": "Prezzo Variabile",
+    "note": "",
+    "tipologia": [
+      "Switch"
+    ],
+    "prezzo": "PUN + 0.000 EUR/kWh",
+    "ccv": "20.00 EUR al mese",
+    "modalitaPagamento": "RID e Bollettino",
+    "disponibile": "no",
+    "dettagli": ""
+  },
+  {
+    "logo": "loghi/logo-edison.png",
+    "brand": "EDISON",
+    "nomeOfferta": "EDISON DYNAMIC LUCE",
+    "tipoCliente": "Privato",
+    "tipoFornitura": "Luce",
+    "tipoOfferta": "Prezzo Variabile",
+    "note": "",
+    "tipologia": [
+      "Switch"
+    ],
+    "prezzo": "PUN + 0.017 EUR/kWh",
+    "ccv": "8.25 EUR al mese",
+    "modalitaPagamento": "RID e Bollettino",
+    "disponibile": "no",
+    "dettagli": ""
+  },
+  {
+    "logo": "loghi/logo-edison.png",
+    "brand": "EDISON",
+    "nomeOfferta": "EDISON SUPERFLEX LUCE",
+    "tipoCliente": "Privato",
+    "tipoFornitura": "Luce",
+    "tipoOfferta": "Prezzo Variabile",
+    "note": "",
+    "tipologia": [
+      "Switch"
+    ],
+    "prezzo": "PUN + 0.020 EUR/kWh",
+    "ccv": "11.50 EUR al mese",
+    "modalitaPagamento": "RID e Bollettino",
+    "disponibile": "no",
+    "dettagli": ""
+  }
+]

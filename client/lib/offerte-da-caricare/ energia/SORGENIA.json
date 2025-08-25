@@ -1,0 +1,36 @@
+[
+  {
+    "logo": "loghi/logo-sorgenia.png",
+    "brand": "SORGENIA",
+    "nomeOfferta": "SORGENIA Next Energy Puntuale Luce – A S2",
+    "tipoCliente": "Privato",
+    "tipoFornitura": "Luce",
+    "tipoOfferta": "Prezzo Variabile",
+    "note": "",
+    "tipologia": [
+      "Switch"
+    ],
+    "prezzo": "PUN + 0.009 EUR/kWh",
+    "ccv": "7.00 EUR al mese",
+    "modalitaPagamento": "RID e Bollettino",
+    "disponibile": "no",
+    "dettagli": ""
+  },
+  {
+    "logo": "loghi/logo-sorgenia.png",
+    "brand": "SORGENIA",
+    "nomeOfferta": "SORGENIA Next Energy Luce Smart – L2",
+    "tipoCliente": "Privato",
+    "tipoFornitura": "Luce",
+    "tipoOfferta": "Prezzo Fisso",
+    "note": "",
+    "tipologia": [
+      "Switch"
+    ],
+    "prezzo": "0.133 EUR/kWh",
+    "ccv": "10.00 EUR al mese",
+    "modalitaPagamento": "Solo Rid",
+    "disponibile": "no",
+    "dettagli": ""
+  }
+]

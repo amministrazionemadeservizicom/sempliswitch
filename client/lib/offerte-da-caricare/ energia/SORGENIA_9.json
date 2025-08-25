@@ -1,0 +1,19 @@
+{
+  "brand": "SORGENIA",
+  "nomeOfferta": "SORGENIA Next Energy Gas Smart – L2",
+  "tipoCliente": "Privato",
+  "tipoFornitura": "Gas",
+  "tipoOfferta": "Prezzo Fisso",
+  "note": "",
+  "tipologia": [
+    "Switch",
+    "Subentro",
+    "Switch con voltura",
+    "Prima Attivazione"
+  ],
+  "prezzo": "0.566 EUR/kWh",
+  "ccv": "10.00 EUR al mese",
+  "modalitaPagamento": "Addebito Diretto su CC e Bollettino Postale",
+  "disponibile": true,
+  "dettagli": ""
+}

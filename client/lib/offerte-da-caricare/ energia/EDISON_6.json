@@ -1,0 +1,19 @@
+{
+  "brand": "EDISON",
+  "nomeOfferta": "EDISON DYNAMIC GAS",
+  "tipoCliente": "Privato",
+  "tipoFornitura": "Gas",
+  "tipoOfferta": "Prezzo Fisso",
+  "note": "",
+  "tipologia": [
+    "Switch",
+    "Subentro",
+    "Switch con voltura",
+    "Prima Attivazione"
+  ],
+  "prezzo": "0.065 EUR/kWh",
+  "ccv": "8.25 EUR al mese",
+  "modalitaPagamento": "Addebito Diretto su CC e Bollettino Postale",
+  "disponibile": true,
+  "dettagli": ""
+}

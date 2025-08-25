@@ -1,1 +1,6 @@
 .netlify/functions/keys/vision-sa.json
+node_modules
+dist
+client/dist
+.env
+.env.*
