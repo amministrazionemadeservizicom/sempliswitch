@@ -69,11 +69,13 @@ export default function Sidebar({ userRole, isCollapsed = false, onToggle, userF
   }, [userRole]);
 
   // Calculate initials from userFullName
-  const initials = userFullName
-    .split(' ')
-    .slice(0, 2)
-    .map(word => word.charAt(0).toUpperCase())
-    .join('');
+  const initials = (userFullName && userFullName !== 'Utente')
+    ? userFullName
+        .split(' ')
+        .slice(0, 2)
+        .map(word => word.charAt(0).toUpperCase())
+        .join('')
+    : 'U';
 
   const handleLogout = () => {
     localStorage.clear();
