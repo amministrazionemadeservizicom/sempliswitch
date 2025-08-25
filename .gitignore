@@ -4,3 +4,7 @@ dist
 client/dist
 .env
 .env.*
+.netlify/functions/keys/vision-sa.json
+node_modules
+dist
+client/dist

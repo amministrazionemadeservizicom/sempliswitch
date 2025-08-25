@@ -139,7 +139,8 @@ export default function Offers() {
   const [detailsOffer, setDetailsOffer] = useState<Offer | null>(null);
   const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
-  
+  const [selectedCompenso, setSelectedCompenso] = useState<number | null>(null);
+
   // Parse URL parameters from practice form
   const [practiceParams, setPracticeParams] = useState<{
     customerType?: string;
@@ -336,9 +337,9 @@ export default function Offers() {
 
   // Filter offers based on practice parameters
   const filteredOffers = offers.filter(offer => {
-    // If no practice params, show all offers only for admin
+    // Se non ci sono parametri pratica, mostra tutte le offerte a QUALSIASI ruolo
     if (!hasParameters()) {
-      return userRole === 'admin';
+      return true;
     }
 
     // Filter by customer type
@@ -497,33 +498,6 @@ export default function Offers() {
     );
   }
 
-  // Empty state when no parameters
-  if (!hasParameters() && userRole !== 'admin') {
-    return (
-      <AppLayout userRole={userRole}>
-        <div className="min-h-screen bg-white">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <CustomCard className="text-center p-12">
-              <div className="text-gray-500">
-                <AlertCircle className="h-16 w-16 mx-auto mb-6 opacity-50" />
-                <h2 className="text-2xl font-bold mb-4">Accesso non autorizzato</h2>
-                <p className="text-lg mb-6">
-                  Questa pagina va aperta dalla Nuova Pratica. Torna indietro e seleziona i criteri.
-                </p>
-                <Button
-                  onClick={() => navigate('/new-practice')}
-                  className="flex items-center gap-2"
-                  style={{ backgroundColor: '#F2C927', color: '#333333' }}
-                >
-                  Torna a Nuova Pratica
-                </Button>
-              </div>
-            </CustomCard>
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
 
   return (
     <AppLayout userRole={userRole}>
@@ -812,7 +786,7 @@ export default function Offers() {
                                             € {pricing.fmt(getBillSimulation(offer.serviceType as EnergySupply)?.spesaMateriaEnergia || 0)} − € {pricing.fmt(sim.spesaOffertaPeriodo)} {" = "}
                                             {" "}
                                             {sim.risparmioPeriodo >= 0 ? (
-                                              <span>risparmio di € {pricing.fmt(sim.risparmioPeriodo)}</span>
+                                              <span>risparmio di �� {pricing.fmt(sim.risparmioPeriodo)}</span>
                                             ) : (
                                               <span>spesa superiore di € {pricing.fmt(Math.abs(sim.risparmioPeriodo))}</span>
                                             )}
@@ -870,7 +844,7 @@ export default function Offers() {
                     }
 
                     {/* Commission Quick View (Consultant/Master only) - Keep existing for backwards compatibility */}
-                    {(userRole === "consulente" || userRole === "master") && hasCommissionPlan() && (
+                    {hasCommissionPlan() && (
                       <div className="mb-6 flex items-center justify-between bg-white p-4 rounded-lg border">
                         <span className="text-sm font-medium">💰 Compenso base:</span>
                         <button
@@ -879,9 +853,21 @@ export default function Offers() {
                         >
                           {visibleCommissions.has(offer.id) ? (
                             <>
-                              <span className="text-xl font-bold" style={{ color: '#E6007E' }}>
-                                €{offer.commission[offer.customerType]}
-                              </span>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xl font-bold" style={{ color: '#E6007E' }}>
+                                  €{offer.commission[offer.customerType]}
+                                </span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedCompenso(offer.commission[offer.customerType]);
+                                  }}
+                                  className="text-gray-500 hover:text-gray-700"
+                                  title="Vedi dettaglio compenso"
+                                >
+                                  👁
+                                </button>
+                              </div>
                               <EyeOff className="h-4 w-4" />
                             </>
                           ) : (
@@ -927,7 +913,7 @@ export default function Offers() {
                       )}
 
                       {/* Visualizza Compenso Button (Consultant/Master only) */}
-                      {(userRole === "consulente" || userRole === "master") && hasCommissionPlan() && (
+                      {hasCommissionPlan() && (
                         <Popover>
                           <PopoverTrigger asChild>
                             <Button
@@ -1063,16 +1049,25 @@ export default function Offers() {
                       </div>
                     )}
 
-                    {/* Commission for Consultants */}
-                    {userRole === "consulente" && (
+                    {/* Commission for all roles */}
+                    {true && (
                       <div className="border-t pt-4">
-                        <h4 className="font-semibold mb-3">Compenso per questo Cliente</h4>
+                        <h4 className="font-semibold mb-3">Compenso per questa offerta</h4>
                         <div className="text-center p-3 bg-gray-50 rounded-lg">
-                          <div className="text-lg font-bold" style={{ color: '#E6007E' }}>
-                            €{detailsOffer.commission[detailsOffer.customerType]}
+                          <div className="mt-2 flex items-center justify-center space-x-2">
+                            <span className="text-lg font-bold" style={{ color: '#E6007E' }}>
+                              €{detailsOffer.commission[detailsOffer.customerType]}
+                            </span>
+                            <button
+                              onClick={() => setSelectedCompenso(detailsOffer.commission[detailsOffer.customerType])}
+                              className="text-gray-500 hover:text-gray-700"
+                              title="Vedi dettaglio compenso"
+                            >
+                              👁
+                            </button>
                           </div>
                           <div className="text-xs text-gray-600 capitalize">
-                            {detailsOffer.customerType}
+                            Tipo cliente: {detailsOffer.customerType}
                           </div>
                         </div>
                       </div>
@@ -1108,6 +1103,26 @@ export default function Offers() {
               )}
             </DialogContent>
           </Dialog>
+
+          {selectedCompenso !== null && (
+            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+              <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
+                <h2 className="text-xl font-bold mb-4">Dettaglio Compenso</h2>
+                <p className="text-lg">
+                  Il compenso previsto per questa offerta è di:
+                  <span className="font-semibold"> € {pricing.fmt(selectedCompenso)}</span>
+                </p>
+                <div className="mt-6 text-right">
+                  <button
+                    onClick={() => setSelectedCompenso(null)}
+                    className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600"
+                  >
+                    Chiudi
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
         </div>
       </div>

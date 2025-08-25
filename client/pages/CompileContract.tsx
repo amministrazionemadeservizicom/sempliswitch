@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import AppLayout from "@/components/AppLayout";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
+import {
   Upload,
   FileText,
   User,
@@ -19,8 +19,16 @@ import {
   CheckCircle,
   AlertTriangle,
   X,
-  Save
+  Save,
+  AlertCircle,
+  ExternalLink
 } from "lucide-react";
+import { extractTextFromFiles, terminateOcrWorker } from "@/utils/ocr";
+import { detectDocType, parseFieldsByType, DocType } from "@/utils/id-parsers";
+/**
+ * ⚠️ Assicurati di configurare la variabile VITE_API_BASE_URL nel file .env per puntare al backend OCR!
+ * Es: VITE_API_BASE_URL="https://backend.example.com/api"
+ */
 
 /** Converte una o più immagini (File) in un unico Blob PDF */
 async function imagesToSinglePdf(images: File[]): Promise<Blob> {
@@ -72,6 +80,28 @@ async function normalizeToSinglePdf(files: FileList): Promise<File | null> {
   }
 
   return null;
+}
+
+/** Unisce due PDF in un unico File PDF */
+async function mergePdfFiles(pdfA: File, pdfB: File): Promise<File> {
+  const aBytes = await pdfA.arrayBuffer();
+  const bBytes = await pdfB.arrayBuffer();
+  const aDoc = await PDFDocument.load(aBytes);
+  const bDoc = await PDFDocument.load(bBytes);
+  const merged = await PDFDocument.create();
+  const aPages = await merged.copyPages(aDoc, aDoc.getPageIndices());
+  aPages.forEach(p => merged.addPage(p));
+  const bPages = await merged.copyPages(bDoc, bDoc.getPageIndices());
+  bPages.forEach(p => merged.addPage(p));
+  const mergedBytes = await merged.save();
+  return new File([mergedBytes], `merged_${Date.now()}.pdf`, { type: 'application/pdf' });
+}
+
+/** Normalizza dei nuovi file in un PDF e lo unisce al documento esistente */
+async function appendFilesToExistingPdf(existing: File, files: FileList): Promise<File | null> {
+  const newPdf = await normalizeToSinglePdf(files);
+  if (!newPdf) return null;
+  return await mergePdfFiles(existing, newPdf);
 }
 
 interface Offer {
@@ -168,6 +198,353 @@ export default function CompileContract() {
     document?: File;
     invoices: Record<string, File>;
   }>({ invoices: {} });
+  const [documentPreviewUrl, setDocumentPreviewUrl] = useState<string | null>(null);
+  const [invoicePreviewUrls, setInvoicePreviewUrls] = useState<Record<string, string>>({});
+  const apiBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL || "";
+  const isOcrConfigured = Boolean(apiBaseUrl);
+  const documentInputRef = useRef<HTMLInputElement>(null);
+  const documentAppendInputRef = useRef<HTMLInputElement>(null);
+
+  // OCR states
+  const [ocrRunning, setOcrRunning] = useState(false);
+  const [ocrText, setOcrText] = useState<string>("");
+  const [ocrPreviews, setOcrPreviews] = useState<string[]>([]);
+  const [docType, setDocType] = useState<DocType>("UNKNOWN");
+
+  // New OCR states for real client-side OCR
+  const [docPreviews, setDocPreviews] = useState<string[]>([]);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrError, setOcrError] = useState<string | null>(null);
+
+  // Document type selector
+  type DocTypeLocal = "ci_nuova" | "ci_vecchia" | "patente" | "passaporto";
+  const [selectedDocType, setSelectedDocType] = useState<DocTypeLocal>("ci_nuova");
+
+  // Cleanup degli ObjectURL e OCR worker
+  useEffect(() => {
+    return () => {
+      if (documentPreviewUrl) URL.revokeObjectURL(documentPreviewUrl);
+      Object.values(invoicePreviewUrls).forEach(u => URL.revokeObjectURL(u));
+      ocrPreviews.forEach(u => URL.revokeObjectURL(u));
+      terminateOcrWorker().catch(() => {});
+      // Rilascia gli URL locali
+      docPreviews.forEach((u) => URL.revokeObjectURL(u));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Helper functions for OCR autofill
+  function capitalizeWords(s: string) {
+    return s.toLowerCase().replace(/\b\p{L}/gu, m => m.toUpperCase());
+  }
+
+  function normalizeDate(s: string) {
+    const [d, m, yRaw] = s.replace(/-/g,"/").replace(/\./g,"/").split("/");
+    const y = Number(yRaw) < 100 ? `19${yRaw}` : yRaw;
+    return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+  }
+
+  // Image preprocessing for better OCR quality
+  async function preprocessImage(file: File): Promise<Blob> {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return resolve(file);
+
+        // Disegno immagine in B/N
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const avg = (data[i] + data[i+1] + data[i+2]) / 3;
+          const bw = avg > 140 ? 255 : 0;  // threshold
+          data[i] = data[i+1] = data[i+2] = bw;
+        }
+        ctx.putImageData(imageData, 0, 0);
+
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else resolve(file);
+        }, "image/png");
+      };
+    });
+  }
+
+  // Advanced regex patterns and parsing
+  function normalizeText(s: string) {
+    return s.replace(/\s+/g, " ").trim();
+  }
+
+  const RX_DATE = /\b(\d{2}\/\d{2}\/\d{4})\b/;
+  const RX_DATE_ALT = /\b(\d{4}-\d{2}-\d{2})\b/;
+  const RX_CF = /\b([A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z])\b/i;
+
+  // Numeri documento
+  const RX_CI_NUOVA_NUM = /\b([A-Z0-9]{9})\b/;
+  const RX_CI_VECCHIA_NUM = /\b(\d{5,8}[A-Z]{0,2})\b/;
+  const RX_PATENTE_NUM = /\b([A-Z]{1,2}\d{6,8})\b/;
+  const RX_PASSAPORTO_NUM = /\b([A-Z]{1,2}\d{6,8}|[A-Z0-9]{9})\b/;
+
+  // Etichette comuni
+  const RX_ENTE = /\b(Rilasciata da|Emessa da|Autorità|Comune|Questura)\s*[:\-]?\s*([A-ZÀ-Ù' \-]+)/i;
+  const RX_RILASCIO = /\b(Data di rilascio|Rilasciata il|Emessa il)\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})/i;
+  const RX_SCADENZA = /\b(Data di scadenza|Scadenza)\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})/i;
+
+  // Extra: nascita
+  const RX_NASCITA = /\b(Nato a|Luogo di nascita)\s*[:\-]?\s*([A-ZÀ-Ù' \-]+)\s+il\s*(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})/i;
+
+  function toIso(d: string) {
+    if (/\d{2}\/\d{2}\/\d{4}/.test(d)) {
+      const [gg, mm, aa] = d.split("/");
+      return `${aa}-${mm}-${gg}`;
+    }
+    if (/\d{4}-\d{2}-\d{2}/.test(d)) return d;
+    return "";
+  }
+
+  function parseNameSurname(txt: string) {
+    let name = "", surname = "";
+    const nm1 = txt.match(/Cognome\s*[:\-]?\s*([A-ZÀ-Ù' -]+)\s+Nome\s*[:\-]?\s*([A-ZÀ-Ù' -]+)/i);
+    const nm2 = txt.match(/Nome\s*[:\-]?\s*([A-ZÀ-Ù' -]+)\s+Cognome\s*[:\-]?\s*([A-ZÀ-Ù' -]+)/i);
+    if (nm1) { surname = nm1[1].trim(); name = nm1[2].trim(); }
+    else if (nm2) { name = nm2[1].trim(); surname = nm2[2].trim(); }
+    const cap = (s: string) => s.toLowerCase().replace(/\b([a-zà-ù'])/g, (m) => m.toUpperCase());
+    return { name: name ? cap(name) : "", surname: surname ? cap(surname) : "" };
+  }
+
+  type ParsedDoc = {
+    number?: string;
+    issueDate?: string;
+    expiryDate?: string;
+    authority?: string;
+    name?: string;
+    surname?: string;
+    cf?: string;
+    birthDate?: string;
+    birthPlace?: string;
+  };
+
+  function parseByDocType(docType: DocTypeLocal, raw: string): ParsedDoc {
+    const t = normalizeText(raw);
+    const parsed: ParsedDoc = {};
+
+    const { name, surname } = parseNameSurname(t);
+    if (name) parsed.name = name;
+    if (surname) parsed.surname = surname;
+
+    const cf = t.match(RX_CF);
+    if (cf) parsed.cf = cf[1].toUpperCase();
+
+    const ente = t.match(RX_ENTE); if (ente) parsed.authority = ente[2].trim();
+    const ril = t.match(RX_RILASCIO) || t.match(RX_DATE) || t.match(RX_DATE_ALT);
+    const sca = t.match(RX_SCADENZA);
+    if (ril) parsed.issueDate = toIso(ril[2] || ril[1]);
+    if (sca) parsed.expiryDate = toIso(sca[2] || sca[1]);
+
+    const nasc = t.match(RX_NASCITA);
+    if (nasc) {
+      parsed.birthPlace = nasc[2].trim();
+      parsed.birthDate = toIso(nasc[3]);
+    }
+
+    switch (docType) {
+      case "ci_nuova": { const m = t.match(RX_CI_NUOVA_NUM); if (m) parsed.number = m[1]; break; }
+      case "ci_vecchia": { const m = t.match(RX_CI_VECCHIA_NUM); if (m) parsed.number = m[1]; break; }
+      case "patente": { const m = t.match(RX_PATENTE_NUM); if (m) parsed.number = m[1]; break; }
+      case "passaporto": { const m = t.match(RX_PASSAPORTO_NUM); if (m) parsed.number = m[1]; break; }
+    }
+
+    return parsed;
+  }
+
+  // Enhanced OCR document files handler with preprocessing
+  async function handleDocumentFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setOcrLoading(true);
+    setOcrError(null);
+    try {
+      // Preprocess images for better OCR quality
+      const preprocessedFiles = await Promise.all(Array.from(files).map(preprocessImage));
+      const { text, previews } = await extractTextFromFiles(preprocessedFiles as File[]);
+      setDocPreviews((prev) => [...prev, ...previews]);
+
+      // Advanced parsing using selected document type
+      const parsed = parseByDocType(selectedDocType, text);
+
+      // Update form fields with extracted data
+      if (parsed.name) {
+        setCustomerData((p) => ({ ...p, nome: parsed.name! }));
+        setDocumentData((p) => ({ ...p, nome: parsed.name! }));
+      }
+      if (parsed.surname) {
+        setCustomerData((p) => ({ ...p, cognome: parsed.surname! }));
+        setDocumentData((p) => ({ ...p, cognome: parsed.surname! }));
+      }
+      if (parsed.cf) {
+        setCustomerData((p) => ({ ...p, cf: parsed.cf! }));
+        setDocumentData((p) => ({ ...p, cf: parsed.cf! }));
+      }
+      if (parsed.number) {
+        setDocumentData((p) => ({ ...p, numeroDocumento: parsed.number! }));
+      }
+      if (parsed.issueDate) {
+        setDocumentData((p) => ({ ...p, dataRilascio: parsed.issueDate! }));
+      }
+      if (parsed.expiryDate) {
+        setDocumentData((p) => ({ ...p, dataScadenza: parsed.expiryDate! }));
+      }
+      // Note: authority, birthDate, birthPlace would need additional fields in DocumentData interface
+
+      console.log('Advanced OCR parsed data:', parsed);
+
+      // Mark document as uploaded
+      setDocumentUploaded(true);
+
+    } catch (err: any) {
+      console.error("OCR error:", err);
+      setOcrError("Impossibile leggere il documento. Riprova con una foto più nitida.");
+    } finally {
+      setOcrLoading(false);
+    }
+  }
+
+  function autofillFromOcr(text: string) {
+    const norm = text.replace(/\s+/g, " ").trim();
+
+    const cf = norm.match(/\b([A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z])\b/i)?.[1];
+    if (cf) {
+      setCustomerData(prev => ({ ...prev, cf: cf.toUpperCase() }));
+      setDocumentData(prev => ({ ...prev, cf: cf.toUpperCase() }));
+    }
+
+    const iban = norm.match(/\b([A-Z]{2}\d{2}[A-Z0-9]{11,30})\b/i)?.[1];
+    if (iban) {
+      setCustomerData(prev => ({ ...prev, iban: iban.replace(/\s/g, "").toUpperCase() }));
+    }
+
+    const nome = norm.match(/(?:Nome|Name)[:\s]+([A-ZÀ-Ù' -]+)/i)?.[1]?.trim();
+    const cognome = norm.match(/(?:Cognome|Surname)[:\s]+([A-ZÀ-Ù' -]+)/i)?.[1]?.trim();
+    if (nome) {
+      const formattedNome = capitalizeWords(nome);
+      setCustomerData(prev => ({ ...prev, nome: formattedNome }));
+      setDocumentData(prev => ({ ...prev, nome: formattedNome }));
+    }
+    if (cognome) {
+      const formattedCognome = capitalizeWords(cognome);
+      setCustomerData(prev => ({ ...prev, cognome: formattedCognome }));
+      setDocumentData(prev => ({ ...prev, cognome: formattedCognome }));
+    }
+
+    const numeroDoc = norm.match(/(?:Numero|Document)[:\s]+([A-Z0-9]+)/i)?.[1]?.trim();
+    if (numeroDoc) {
+      setDocumentData(prev => ({ ...prev, numeroDocumento: numeroDoc }));
+    }
+
+    const dataRilascio = norm.match(/(?:Rilasciato|Issued)[:\s]+(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/i)?.[1];
+    if (dataRilascio) {
+      setDocumentData(prev => ({ ...prev, dataRilascio: normalizeDate(dataRilascio) }));
+    }
+
+    const dataScadenza = norm.match(/(?:Scadenza|Expires)[:\s]+(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/i)?.[1];
+    if (dataScadenza) {
+      setDocumentData(prev => ({ ...prev, dataScadenza: normalizeDate(dataScadenza) }));
+    }
+  }
+
+  // OCR-enabled document upload handler
+  async function handleIdUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    if (!files.length) return;
+
+    setOcrRunning(true);
+    try {
+      const { text, previews } = await extractTextFromFiles(files);
+      setOcrText(text);
+
+      // Clean up old previews
+      ocrPreviews.forEach(u => URL.revokeObjectURL(u));
+      setOcrPreviews(previews);
+
+      // Smart document type detection and parsing
+      const detected = detectDocType(text);
+      setDocType(detected);
+      const parsed = parseFieldsByType(detected, text);
+
+      // Map parsed fields to form state (adapting setValue calls to current state management)
+      if (parsed.nome) {
+        setCustomerData(prev => ({ ...prev, nome: parsed.nome! }));
+        setDocumentData(prev => ({ ...prev, nome: parsed.nome! }));
+      }
+      if (parsed.cognome) {
+        setCustomerData(prev => ({ ...prev, cognome: parsed.cognome! }));
+        setDocumentData(prev => ({ ...prev, cognome: parsed.cognome! }));
+      }
+      if (parsed.codiceFiscale) {
+        setCustomerData(prev => ({ ...prev, cf: parsed.codiceFiscale! }));
+        setDocumentData(prev => ({ ...prev, cf: parsed.codiceFiscale! }));
+      }
+      if (parsed.iban) {
+        setCustomerData(prev => ({ ...prev, iban: parsed.iban! }));
+      }
+      if (parsed.numeroDocumento) {
+        setDocumentData(prev => ({ ...prev, numeroDocumento: parsed.numeroDocumento! }));
+      }
+      if (parsed.scadenza) {
+        setDocumentData(prev => ({ ...prev, dataScadenza: parsed.scadenza! }));
+      }
+      if (parsed.dataNascita) {
+        // Add birth date to document data if we had that field
+        console.log('Data nascita rilevata:', parsed.dataNascita);
+      }
+
+      // Fallback to generic OCR parsing for any missed fields
+      autofillFromOcr(text);
+
+      // Also normalize files to single PDF for upload
+      const finalFile = await normalizeToSinglePdf(e.target.files!);
+      if (finalFile) {
+        setUploadedFiles(prev => ({ ...prev, document: finalFile as File }));
+        setDocumentUploaded(true);
+      }
+    } catch (err) {
+      console.error("OCR error", err);
+      setErrors(prev => [...prev, "Errore nell'elaborazione OCR del documento."]);
+    } finally {
+      setOcrRunning(false);
+      e.currentTarget.value = '';
+    }
+  }
+
+  const handleDocumentAppend = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!uploadedFiles.document) return; // safety
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    try {
+      setIsProcessing(true);
+      const merged = await appendFilesToExistingPdf(uploadedFiles.document, files);
+      if (!merged) return;
+      // ricalcola l'OCR sul PDF completo per popolare nuovamente i campi
+      const extracted = await processDocumentOCR(merged);
+      setDocumentData(extracted);
+      setCustomerData(prev => ({ ...prev, nome: extracted.nome, cognome: extracted.cognome, cf: extracted.cf }));
+      setUploadedFiles(prev => ({ ...prev, document: merged }));
+      const prevUrl = documentPreviewUrl;
+      const newUrl = URL.createObjectURL(merged);
+      if (prevUrl) URL.revokeObjectURL(prevUrl);
+      setDocumentPreviewUrl(newUrl);
+    } catch (e) {
+      console.error('Append documento fallito:', e);
+      setErrors(prev => [...prev, "Errore nell'aggiunta pagine al documento."]);
+    } finally {
+      setIsProcessing(false);
+      event.currentTarget.value = '';
+    }
+  };
 
   // Load offers from localStorage and check if should redirect
   useEffect(() => {
@@ -257,45 +634,83 @@ export default function CompileContract() {
     }
   }, [selectedOffers, navigate, isLoaded]);
 
-  // Mock OCR function for document processing
+  /** Invoca il backend OCR caricando il file come FormData.
+   *  Endpoint attesi:
+   *   - POST `${import.meta.env.VITE_API_BASE_URL}/ocr/document` -> DocumentData
+   *   - POST `${import.meta.env.VITE_API_BASE_URL}/ocr/invoice`  -> InvoiceData
+   */
+  async function callOcrApi<T>(path: "/ocr/document" | "/ocr/invoice", file: File): Promise<T> {
+    const base = import.meta.env.VITE_API_BASE_URL || "";
+    if (!base) {
+      throw new Error("OCR non configurato (manca VITE_API_BASE_URL).");
+    }
+    const url = `${base}${path}`;
+    const form = new FormData();
+    form.append("file", file, file.name);
+
+    const res = await fetch(url, {
+      method: "POST",
+      body: form,
+    });
+
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`OCR API error ${res.status}: ${txt}`);
+    }
+    return (await res.json()) as T;
+  }
+
+  // Sostituisce il MOCK: usa l'endpoint /ocr/document
   const processDocumentOCR = async (file: File): Promise<DocumentData> => {
-    setIsProcessing(true);
-    
-    // Simulate OCR processing delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Mock OCR extracted data
-    const mockData: DocumentData = {
-      nome: "Mario",
-      cognome: "Rossi",
-      cf: "RSSMRA80A01H501X",
-      numeroDocumento: "AX1234567",
-      dataRilascio: "15/01/2020",
-      dataScadenza: "15/01/2030"
-    };
-    
-    setIsProcessing(false);
-    return mockData;
+    try {
+      // Invia SEMPRE il PDF già normalizzato/mergiato
+      const data = await callOcrApi<DocumentData>("/ocr/document", file);
+
+      // Normalizzazione/valori di sicurezza: evita undefined
+      return {
+        nome: data?.nome || "",
+        cognome: data?.cognome || "",
+        cf: data?.cf || "",
+        numeroDocumento: data?.numeroDocumento || "",
+        dataRilascio: data?.dataRilascio || "",
+        dataScadenza: data?.dataScadenza || "",
+      };
+    } catch (err: any) {
+      console.error("OCR documento fallito:", err);
+      setErrors(prev => [...prev, err?.message || "OCR documento non disponibile. Compila i campi a mano."]);
+      return {
+        nome: "",
+        cognome: "",
+        cf: "",
+        numeroDocumento: "",
+        dataRilascio: "",
+        dataScadenza: "",
+      };
+    }
   };
 
-  // Mock OCR function for invoice processing
+  // Sostituisce il MOCK: usa l'endpoint /ocr/invoice
   const processInvoiceOCR = async (file: File): Promise<InvoiceData> => {
-    setIsProcessing(true);
-    
-    // Simulate OCR processing delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Mock OCR extracted data
-    const mockData: InvoiceData = {
-      pod: "IT001E12345678",
-      indirizzoFornitura: "Via Roma 123, Milano",
-      indirizzoFatturazione: "Via Roma 123, Milano",
-      kwImpegnati: "3.0",
-      tensione: "230V"
-    };
-    
-    setIsProcessing(false);
-    return mockData;
+    try {
+      const data = await callOcrApi<InvoiceData>("/ocr/invoice", file);
+      return {
+        pod: data?.pod || "",
+        indirizzoFornitura: data?.indirizzoFornitura || "",
+        indirizzoFatturazione: data?.indirizzoFatturazione || "",
+        kwImpegnati: data?.kwImpegnati || "",
+        tensione: data?.tensione || "",
+      };
+    } catch (err: any) {
+      console.error("OCR fattura fallito:", err);
+      setErrors(prev => [...prev, err?.message || "OCR fattura non disponibile. Compila i campi a mano."]);
+      return {
+        pod: "",
+        indirizzoFornitura: "",
+        indirizzoFatturazione: "",
+        kwImpegnati: "",
+        tensione: "",
+      };
+    }
   };
 
   const handleDocumentUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -325,6 +740,10 @@ export default function CompileContract() {
         cognome: extractedData.cognome,
         cf: extractedData.cf
       }));
+
+      const previewUrl = URL.createObjectURL(finalFile as File);
+      if (documentPreviewUrl) URL.revokeObjectURL(documentPreviewUrl);
+      setDocumentPreviewUrl(previewUrl);
 
       // Salva il file finale per l'upload sicuro più avanti
       setUploadedFiles(prev => ({ ...prev, document: finalFile as File }));
@@ -359,6 +778,12 @@ export default function CompileContract() {
       // OCR mock come oggi
       const extractedData = await processInvoiceOCR(finalFile as File);
       setInvoiceData(prev => ({ ...prev, [offerId]: extractedData }));
+
+      const url = URL.createObjectURL(finalFile as File);
+      setInvoicePreviewUrls(prev => {
+        if (prev[offerId]) URL.revokeObjectURL(prev[offerId]);
+        return { ...prev, [offerId]: url };
+      });
 
       // Salva file per upload sicuro
       setUploadedFiles(prev => ({
@@ -530,6 +955,15 @@ export default function CompileContract() {
             <p className="text-gray-600">Inserisci i dati del cliente e carica i documenti necessari</p>
           </div>
 
+          {!isOcrConfigured && docPreviews.length === 0 && (
+            <Alert className="mb-6 border-amber-200 bg-amber-50">
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-700">
+                OCR esterno non configurato. L'OCR client-side è attivo per l'estrazione automatica dei dati dai documenti.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Selected Offers Summary */}
           <CustomCard className="mb-8">
             <CardHeader>
@@ -651,40 +1085,85 @@ export default function CompileContract() {
                   <Camera className="h-5 w-5" />
                   Documento d'Identità
                 </CardTitle>
+                <p className="text-sm text-gray-600 mt-1">Puoi caricare PDF singoli o più foto; se ne carichi più di una le uniamo in un unico PDF.</p>
               </CardHeader>
               <CardContent className="space-y-4">
-                {!documentUploaded ? (
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                    <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                    <div className="space-y-2">
-                      <p className="text-gray-600">Carica documento d'identità</p>
-                      <p className="text-sm text-gray-500">PDF, JPG o PNG - Max 10MB</p>
-                      <input
-                        type="file"
-                        accept="application/pdf,image/*"
-                        multiple
-                        capture="environment"
-                        onChange={handleDocumentUpload}
-                        className="hidden"
-                        id="document-upload"
-                      />
-                      <label htmlFor="document-upload">
-                        <Button 
-                          type="button"
-                          style={{ backgroundColor: '#F2C927', color: '#333333' }}
-                          className="cursor-pointer"
-                        >
-                          Seleziona File
-                        </Button>
-                      </label>
-                    </div>
+                <div className="space-y-3">
+                  {/* Document Type Selector */}
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span className="text-sm text-gray-600">Tipo documento:</span>
+                    {(["ci_nuova","ci_vecchia","patente","passaporto"] as DocTypeLocal[]).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setSelectedDocType(t)}
+                        className={`px-3 py-1 rounded-full border text-sm transition-colors ${
+                          selectedDocType === t ? "bg-black text-white" : "bg-white hover:bg-gray-50"
+                        }`}
+                      >
+                        {t.replace("_"," ")}
+                      </button>
+                    ))}
                   </div>
-                ) : (
-                  <div className="border border-green-200 bg-green-50 rounded-lg p-4">
+
+                  <div className="border-2 border-dashed rounded-xl p-5 text-center">
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      multiple
+                      onChange={(e) => handleDocumentFiles(e.target.files)}
+                      className="hidden"
+                      id="doc-upload"
+                    />
+                    <label
+                      htmlFor="doc-upload"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg"
+                      style={{ backgroundColor: '#F2C927', color: '#333', cursor: 'pointer' }}
+                    >
+                      Seleziona file (fronte/retro)
+                    </label>
+
+                    {ocrLoading && (
+                      <p className="mt-3 text-sm text-gray-600">Estrazione in corso…</p>
+                    )}
+                    {ocrError && (
+                      <p className="mt-3 text-sm text-red-600">{ocrError}</p>
+                    )}
+                    
+                    {/* Document Type Detection */}
+                    {docType !== "UNKNOWN" && (
+                      <div className="text-xs text-green-600 font-medium mt-2">✓ Documento riconosciuto: {docType}</div>
+                    )}
+                  </div>
+
+                  {docPreviews.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {docPreviews.map((src, i) => (
+                        <div key={i} className="border rounded-lg overflow-hidden bg-white">
+                          <img src={src} alt={`doc-${i}`} className="w-full h-36 object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <label
+                      htmlFor="doc-upload"
+                      className="text-sm underline cursor-pointer"
+                    >
+                      Aggiungi un altro file
+                    </label>
+                  </div>
+                </div>
+                
+                {/* Document data fields - show when document is uploaded */}
+                {documentUploaded && (
+                  <div className="border border-green-200 bg-green-50 rounded-lg p-4 mt-4">
                     <div className="flex items-center gap-2 text-green-700 mb-3">
                       <CheckCircle className="h-5 w-5" />
-                      <span className="font-medium">Documento caricato e processato</span>
+                      <span className="font-medium">Documento elaborato con OCR avanzato ({selectedDocType.replace("_", " ")})</span>
                     </div>
+                    
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="doc-numero">Numero Documento</Label>
@@ -740,20 +1219,18 @@ export default function CompileContract() {
                           type="file"
                           accept="application/pdf,image/*"
                           multiple
-                          capture="environment"
                           onChange={(e) => handleInvoiceUpload(e, offer.id)}
                           className="hidden"
                           id={`invoice-upload-${offer.id}`}
                         />
-                        <label htmlFor={`invoice-upload-${offer.id}`}>
-                          <Button 
-                            type="button"
-                            style={{ backgroundColor: '#F2C927', color: '#333333' }}
-                            className="cursor-pointer"
-                          >
-                            Seleziona File
-                          </Button>
-                        </label>
+                        <Button
+                          type="button"
+                          onClick={() => document.getElementById(`invoice-upload-${offer.id}`)?.click()}
+                          style={{ backgroundColor: '#F2C927', color: '#333333' }}
+                          className="cursor-pointer"
+                        >
+                          Seleziona File
+                        </Button>
                       </div>
                     </div>
                   ) : (
@@ -800,6 +1277,64 @@ export default function CompileContract() {
                           />
                         </div>
                       </div>
+                      <div className="mt-4 flex items-center gap-3">
+                        <input
+                          type="file"
+                          accept="application/pdf,image/*"
+                          multiple
+                          onChange={async (e) => {
+                            const files = e.target.files;
+                            if (!files || files.length === 0) return;
+                            try {
+                              setIsProcessing(true);
+                              const existing = uploadedFiles.invoices[offer.id];
+                              if (!existing) return;
+                              const merged = await appendFilesToExistingPdf(existing, files);
+                              if (!merged) return;
+                              // OCR mock sulla versione completa della fattura
+                              const extracted = await processInvoiceOCR(merged);
+                              setInvoiceData(prev => ({ ...prev, [offer.id]: extracted }));
+                              setUploadedFiles(prev => ({
+                                ...prev,
+                                invoices: { ...prev.invoices, [offer.id]: merged }
+                              }));
+                              setInvoicePreviewUrls(prev => {
+                                if (prev[offer.id]) URL.revokeObjectURL(prev[offer.id]);
+                                const newUrl = URL.createObjectURL(merged);
+                                return { ...prev, [offer.id]: newUrl };
+                              });
+                            } catch (err) {
+                              console.error('Append fattura fallito:', err);
+                              setErrors(prev => [...prev, "Errore nell'aggiunta pagine alla fattura."]);
+                            } finally {
+                              setIsProcessing(false);
+                              e.currentTarget.value = '';
+                            }
+                          }}
+                          className="hidden"
+                          id={`invoice-append-${offer.id}`}
+                        />
+                        <Button
+                          type="button"
+                          onClick={() => document.getElementById(`invoice-append-${offer.id}`)?.click()}
+                          style={{ backgroundColor: '#F2C927', color: '#333333' }}
+                        >
+                          Aggiungi pagine fattura
+                        </Button>
+                      </div>
+                      {invoicePreviewUrls[offer.id] && (
+                        <div className="mt-4">
+                          <Label>Anteprima fattura</Label>
+                          <div className="mt-2 border rounded-lg overflow-hidden">
+                            <iframe src={invoicePreviewUrls[offer.id]} title={`Anteprima fattura ${offer.id}`} className="w-full h-72" />
+                          </div>
+                          <div className="mt-2">
+                            <a href={invoicePreviewUrls[offer.id]} target="_blank" rel="noreferrer" className="inline-flex items-center text-sm underline text-blue-700">
+                              Apri in nuova scheda <ExternalLink className="h-4 w-4 ml-1" />
+                            </a>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </CardContent>
@@ -807,11 +1342,12 @@ export default function CompileContract() {
             ))}
 
             {/* Processing Indicator */}
-            {isProcessing && (
+            {(isProcessing || ocrRunning || ocrLoading) && (
               <Alert className="border-blue-200 bg-blue-50">
                 <Camera className="h-4 w-4 text-blue-600" />
                 <AlertDescription className="text-blue-600">
-                  Elaborazione documento in corso con OCR...
+                  {ocrLoading ? "Estrazione dati in corso con OCR avanzato..." : 
+                   ocrRunning ? "Estrazione dati in corso con OCR..." : "Elaborazione documento in corso..."}
                 </AlertDescription>
               </Alert>
             )}
