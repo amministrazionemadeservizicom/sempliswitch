@@ -275,6 +275,9 @@ export default function NewPractice() {
   const navigate = useNavigate();
   const { user: currentUser, userRole } = useAuth();
   const { toast } = useToast();
+
+  // Debug: log userRole to verify consistency
+  console.log('🔍 NewPractice - userRole from useAuth:', userRole);
   
   // File upload refs
   const documentoRef = useRef<HTMLInputElement>(null);
