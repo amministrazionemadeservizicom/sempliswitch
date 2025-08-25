@@ -102,36 +102,21 @@ async function recognizeOne(blob: Blob, psm: PSM) {
   return worker.recognize(blob);
 }
 
-// 🔥 Prova rotazioni 0°, 90°, 180°, 270° e PSM multipli
-async function tryRotations(canvas: HTMLCanvasElement, psms: PSM[]) {
-  const angles = [0, 90, 180, 270];
-  let best = { text: '', conf: 0 };
+// 🔥 OCR veloce - solo orientamento normale + un PSM
+async function fastOCR(canvas: HTMLCanvasElement) {
+  try {
+    const blob = await canvasToBlob(canvas);
+    const worker = await getOcrWorker();
 
-  for (const angle of angles) {
-    const tmp = document.createElement('canvas');
-    const tctx = tmp.getContext('2d')!;
-    if (angle % 180 === 0) { 
-      tmp.width = canvas.width; tmp.height = canvas.height; 
-    } else { 
-      tmp.width = canvas.height; tmp.height = canvas.width; 
-    }
-    tctx.translate(tmp.width/2, tmp.height/2);
-    tctx.rotate(angle * Math.PI / 180);
-    tctx.drawImage(canvas, -canvas.width/2, -canvas.height/2);
+    // Usa solo PSM AUTO per velocità
+    await worker.setParameters({ tessedit_pageseg_mode: String(PSM.AUTO) as any });
+    const { data } = await worker.recognize(blob);
 
-    const blob = await canvasToBlob(tmp);
-    
-    for (const psm of psms) {
-      try {
-        const { data } = await recognizeOne(blob, psm);
-        const conf = data.confidence || 0;
-        const text = data.text || '';
-        if (conf > best.conf) best = { text, conf };
-        if (best.conf > 70 && best.text.trim().length > 10) return best;
-      } catch {}
-    }
+    return { text: data.text || '', conf: data.confidence || 0 };
+  } catch (error) {
+    console.warn('OCR failed:', error);
+    return { text: '', conf: 0 };
   }
-  return best;
 }
 
 // 🔥 Gestione PDF
