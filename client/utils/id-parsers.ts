@@ -153,6 +153,41 @@ export function parseCIE(text: string): ParsedFields {
     if (nomeMatch) nome = nomeMatch[1].trim();
   }
 
+  // Additional fallback patterns - look for patterns without strict formatting
+  if (!cognome) {
+    // Try to find cognome after any surname indicator
+    const patterns = [
+      /COGNOME[:\s]*([A-ZÀ-Ù' -]+)/i,
+      /SURNAME[:\s]*([A-ZÀ-Ù' -]+)/i,
+      /^([A-ZÀ-Ù' -]+)\s*\/\s*SURNAME/i
+    ];
+    for (const pattern of patterns) {
+      const match = t.match(pattern);
+      if (match && match[1].trim().length > 1) {
+        cognome = match[1].trim();
+        console.log('📝 Found cognome with fallback:', cognome);
+        break;
+      }
+    }
+  }
+
+  if (!nome) {
+    // Try to find nome after any name indicator
+    const patterns = [
+      /NOME[:\s]*([A-ZÀ-Ù' -]+)/i,
+      /NAME[:\s]*([A-ZÀ-Ù' -]+)/i,
+      /^([A-ZÀ-Ù' -]+)\s*\/\s*NAME/i
+    ];
+    for (const pattern of patterns) {
+      const match = t.match(pattern);
+      if (match && match[1].trim().length > 1) {
+        nome = match[1].trim();
+        console.log('📝 Found nome with fallback:', nome);
+        break;
+      }
+    }
+  }
+
   // Extract document number (format like CA89525IB)
   const docNumMatch = t.match(/\b([A-Z]{2}\d{5}[A-Z]{1,2})\b/) || t.match(/N\.[\s]*([A-Z0-9]{6,12})/i);
   if (docNumMatch) {
