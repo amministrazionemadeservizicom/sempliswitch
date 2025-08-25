@@ -367,27 +367,19 @@ export default function CompileContract() {
     }
   }, [selectedOffers, navigate, isLoaded]);
   
-  // Handle document upload with OCR (Tesseract.js)
+  // Handle document upload with OCR (Netlify Functions)
   const handleDocumentUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
     setOcrLoading(true);
     try {
-      const { text, previews } = await extractTextFromFiles(Array.from(files));
+      const { text, detectedType, parsed, previews } = await processDocumentOCR(Array.from(files));
       setDocPreviews(prev => [...prev, ...previews]);
 
       // Debug: log extracted text
       console.log("📄 Testo estratto OCR:", text);
-
-      // Detect document type and parse
-      const detectedType = detectDocType(text);
       console.log("🔍 Tipo documento rilevato:", detectedType);
-
-      const parsed = parseFieldsByType(detectedType, text);
       console.log("📋 Dati parsificati:", parsed);
-
-      // Show success message
-      toast.success("Documento elaborato con successo. I campi sono stati compilati automaticamente.");
 
       // Auto-fill form fields with debug
       let filledFields = 0;
@@ -419,8 +411,11 @@ export default function CompileContract() {
 
       console.log(`📊 Totale campi compilati: ${filledFields}/5`);
 
+      // Show success message
+      toast.success(`Documento elaborato con Netlify OCR. ${filledFields} campi compilati automaticamente.`);
+
       setDocumentUploaded(true);
-      setOcrSource(prev => ({ ...prev, doc: 'tesseract' }));
+      setOcrSource(prev => ({ ...prev, doc: 'netlify' }));
 
       // Show info toast if detected type differs from selected
       const selectedDocType = watch("docTipo");
@@ -437,7 +432,7 @@ export default function CompileContract() {
 
     } catch (err: any) {
       console.error("OCR error:", err);
-      toast.error("Errore nell'elaborazione OCR del documento. Compila i campi manualmente.");
+      toast.error(`Errore nell'elaborazione OCR del documento: ${err.message}. Compila i campi manualmente.`);
     } finally {
       setOcrLoading(false);
     }
