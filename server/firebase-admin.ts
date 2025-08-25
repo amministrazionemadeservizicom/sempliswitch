@@ -133,6 +133,143 @@ export const adminOperations = {
     }
   },
 
+  // Save new contract with admin privileges
+  async saveContract(contractData: {
+    cliente: {
+      nome: string;
+      cognome: string;
+      codiceFiscale: string;
+      cellulare: string;
+      email: string;
+      iban?: string;
+    };
+    documento: {
+      tipo: string;
+      numero?: string;
+      rilasciatoDa: string;
+      dataRilascio: string;
+      dataScadenza: string;
+    };
+    indirizzi: {
+      residenza: {
+        via: string;
+        civico: string;
+        citta: string;
+        cap: string;
+      };
+      fornitura: {
+        via: string;
+        civico: string;
+        citta: string;
+        cap: string;
+      };
+    };
+    pod?: string;
+    pdr?: string;
+    potenzaImpegnataKw?: number;
+    usiGas?: string[];
+    residenziale?: string;
+    offerte: any[];
+  }, userId: string, userName: string, userSurname: string, masterReference?: string) {
+    try {
+      // Generate unique contract code
+      const timestamp = Date.now();
+      const codiceUnivocoOfferta = `CON-${timestamp}`;
+
+      // Determine contract type and provider from selected offers
+      const tipologiaContratto = contractData.offerte.some(offer =>
+        offer.serviceType === "Luce" || offer.serviceType === "Gas"
+      ) ? "energia" : "telefonia";
+
+      const gestore = contractData.offerte[0]?.brand || "UNKNOWN";
+
+      // Create contract document with proper structure
+      const contractForFirebase = {
+        codiceUnivocoOfferta,
+        dataCreazione: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
+        creatoDa: {
+          id: userId,
+          nome: userName,
+          cognome: userSurname
+        },
+        contatto: {
+          nome: contractData.cliente.nome,
+          cognome: contractData.cliente.cognome,
+          codiceFiscale: contractData.cliente.codiceFiscale
+        },
+        isBusiness: false, // Default to residential
+        statoOfferta: 'Caricato',
+        noteStatoOfferta: 'Contratto appena creato',
+        gestore,
+        masterReference: masterReference || '',
+        tipologiaContratto,
+
+        // Additional detailed data
+        dettagliCliente: {
+          cellulare: contractData.cliente.cellulare,
+          email: contractData.cliente.email,
+          iban: contractData.cliente.iban || null
+        },
+        documento: contractData.documento,
+        indirizzi: contractData.indirizzi,
+        datiTecnici: {
+          pod: contractData.pod || null,
+          pdr: contractData.pdr || null,
+          potenzaImpegnataKw: contractData.potenzaImpegnataKw || null,
+          usiGas: contractData.usiGas || [],
+          residenziale: contractData.residenziale || null
+        },
+        offerte: contractData.offerte || [],
+
+        // Timestamps
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+
+      // Clean undefined values
+      const cleanedContract = this.cleanUndefinedValues(contractForFirebase);
+
+      console.log('💾 Saving contract via Admin SDK:', cleanedContract);
+
+      const docRef = await adminDb.collection('contracts').add(cleanedContract);
+
+      console.log('✅ Contract saved successfully with ID:', docRef.id);
+
+      return {
+        success: true,
+        contractId: docRef.id,
+        codiceUnivocoOfferta
+      };
+
+    } catch (error) {
+      console.error('❌ Error saving contract via Admin SDK:', error);
+      throw error;
+    }
+  },
+
+  // Helper function to clean undefined values
+  cleanUndefinedValues(obj: any): any {
+    if (obj === null || obj === undefined) {
+      return null;
+    }
+
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.cleanUndefinedValues(item)).filter(item => item !== undefined);
+    }
+
+    if (typeof obj === 'object') {
+      const cleaned: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value !== undefined) {
+          cleaned[key] = this.cleanUndefinedValues(value);
+        }
+      }
+      return cleaned;
+    }
+
+    return obj;
+  },
+
   // Delete contract with admin privileges
   async deleteContract(contractId: string) {
     try {
