@@ -251,6 +251,8 @@ export default function CompileContract() {
       fornCap: "",
       pod: "",
       pdr: "",
+      potenzaImpegnataKw: undefined,
+      usiGas: [] as ("cottura" | "riscaldamento" | "acqua_calda")[],
       residenziale: "si" as const,
     },
   });
