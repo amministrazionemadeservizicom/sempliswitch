@@ -50,6 +50,7 @@ interface SidebarProps {
   isCollapsed?: boolean;
   onToggle?: () => void;
   userFullName?: string;
+  onUserClick?: () => void;
 }
 
 export default function Sidebar({ userRole, isCollapsed = false, onToggle, userFullName = "Utente" }: SidebarProps) {
