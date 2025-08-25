@@ -135,10 +135,13 @@ export default function AppLayout({
             </div>
                        
             <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold text-gray-800">
+              <button
+                onClick={handleUserClick}
+                className="text-sm font-semibold text-gray-800 hover:bg-black hover:bg-opacity-10 px-3 py-1 rounded-lg transition-colors"
+              >
                 <User className="h-4 w-4 inline mr-1" />
                 {userFullName}
-              </span>
+              </button>
               <Button
                 variant="ghost"
                 size="sm"
