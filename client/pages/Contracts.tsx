@@ -67,24 +67,29 @@ export default function Contracts() {
 
   useEffect(() => {
     const fetchContracts = async () => {
-      try {
-        setLoading(true);
-        console.log("🔄 Caricamento contratti da Firebase...");
-        
-        if (!db) {
-          console.warn("⚠️ Database Firebase non configurato");
-          toast({
-            variant: "destructive",
-            title: "Errore di configurazione",
-            description: "Database Firebase non configurato correttamente"
-          });
-          setContracts([]);
-          setLoading(false);
-          return;
-        }
+    try {
+      setLoading(true);
+      console.log("🔄 Caricamento contratti da Firebase...");
+      console.log("🔥 Firebase DB object:", db);
+      console.log("👤 Current user:", currentUser);
+      console.log("🔑 User role:", userRole);
 
-        const querySnapshot = await getDocs(collection(db, "contratti"));
-        console.log("📊 Contratti trovati:", querySnapshot.size);
+      if (!db) {
+        console.warn("⚠️ Database Firebase non configurato");
+        toast({
+          variant: "destructive",
+          title: "Errore di configurazione",
+          description: "Database Firebase non configurato correttamente"
+        });
+        setContracts([]);
+        setLoading(false);
+        return;
+      }
+
+      console.log("📡 Attempting to fetch from 'contratti' collection...");
+      const querySnapshot = await getDocs(collection(db, "contratti"));
+      console.log("📊 Contratti trovati:", querySnapshot.size);
+      console.log("📋 Query snapshot:", querySnapshot);
         
         const contractsFromFirebase: Contract[] = querySnapshot.docs.map((doc) => {
           const data = doc.data();
