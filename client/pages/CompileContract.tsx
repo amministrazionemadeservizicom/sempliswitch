@@ -1116,7 +1116,7 @@ export default function CompileContract() {
                           </div>
                         </div>
                         {errors.usiGas && (
-                          <p className="text-sm text-red-600 mt-1">{errors.usiGas.message}</p>
+                          <p className="text-sm text-red-600 mt-1">{errors.usiGas.message?.toString()}</p>
                         )}
                       </div>
                     </div>
