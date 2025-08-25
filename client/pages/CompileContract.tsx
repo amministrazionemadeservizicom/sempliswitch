@@ -326,9 +326,20 @@ export default function CompileContract() {
             const customerType = offer.customerType ?? offer.tipoCliente ?? offer.segmento ?? "residenziale";
             const price = offer.price ?? offer.prezzo ?? offer.costo ?? "";
             
-            return { 
+            // Inferire commodity dal serviceType se non presente
+            let commodity = offer.commodity;
+            if (!commodity) {
+              const service = serviceType.toLowerCase();
+              if (service.includes("luce") || service.includes("electric")) {
+                commodity = "electricity";
+              } else if (service.includes("gas")) {
+                commodity = "gas";
+              }
+            }
+
+            return {
               id, name, brand, serviceType, customerType, price,
-              commodity: offer.commodity,
+              commodity: commodity,
               segment: offer.segment,
               requiresIban: offer.requiresIban
             } as Offer;
