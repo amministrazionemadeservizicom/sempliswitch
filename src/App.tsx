@@ -54,7 +54,7 @@ const App = () => {
               element={
                 userRole === "admin"
                   ? <Navigate to="/admin-dashboard" replace />
-                  : <Dashboard userRole="consulente" />
+                  : <Dashboard userRole={userRole || "consulente"} />
               }
             />
 
@@ -79,11 +79,11 @@ const App = () => {
             <Route
               path="/create-user"
               element={
-                userRole === "admin" ? (
+                (userRole === "admin" || userRole === "master") ? (
                   <CreateUser />
                 ) : (
                   <p style={{ padding: "2rem", fontSize: 18, color: "red" }}>
-                    Accesso negato: questa pagina è riservata agli admin.
+                    Accesso negato: questa pagina è riservata agli admin e master.
                   </p>
                 )
               }
