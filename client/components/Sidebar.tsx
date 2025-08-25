@@ -53,7 +53,7 @@ interface SidebarProps {
   onUserClick?: () => void;
 }
 
-export default function Sidebar({ userRole, isCollapsed = false, onToggle, userFullName = "Utente" }: SidebarProps) {
+export default function Sidebar({ userRole, isCollapsed = false, onToggle, userFullName = "Utente", onUserClick }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
