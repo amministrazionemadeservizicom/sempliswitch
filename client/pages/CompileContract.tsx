@@ -229,7 +229,10 @@ export default function CompileContract() {
   const [docPreviews, setDocPreviews] = useState<string[]>([]);
   const [billPreviews, setBillPreviews] = useState<string[]>([]);
   const [ocrSource, setOcrSource] = useState<{ doc?: 'google' | 'tesseract'; bill?: 'google' | 'tesseract' }>({});
-  
+
+  // Camera hook for mobile photo capture
+  const { isMobile, isCapturing, capturePhoto, error: cameraError, clearError } = useCamera();
+
   const selectedOffer = selectedOffers[0]; // Use first offer for validation logic
   
   const form = useForm({
