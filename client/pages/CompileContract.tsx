@@ -508,6 +508,7 @@ export default function CompileContract() {
       }
 
       setBillUploaded(true);
+      setOcrSource(prev => ({ ...prev, bill: source }));
 
     } catch (err: any) {
       console.error("Bill OCR error:", err);
