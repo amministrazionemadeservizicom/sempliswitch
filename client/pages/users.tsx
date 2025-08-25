@@ -503,6 +503,187 @@ export default function Users() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            {/* Edit User Modal */}
+            <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+              <DialogContent className="sm:max-w-lg font-roboto max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Edit className="h-5 w-5" />
+                    Modifica Utente
+                  </DialogTitle>
+                  <DialogDescription>
+                    Modifica i dati dell'utente selezionato
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-nome">Nome *</Label>
+                      <Input
+                        id="edit-nome"
+                        value={formData.nome}
+                        onChange={(e) => setFormData({...formData, nome: e.target.value})}
+                        placeholder="Mario Rossi"
+                        className="rounded-2xl"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-email">Email *</Label>
+                      <Input
+                        id="edit-email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({...formData, email: e.target.value})}
+                        placeholder="mario@sempliswitch.com"
+                        className="rounded-2xl"
+                        disabled
+                      />
+                      <p className="text-xs text-gray-500 mt-1">L'email non può essere modificata</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-ruolo">Ruolo</Label>
+                      <Select value={formData.ruolo} onValueChange={(value: 'admin' | 'back office' | 'consulente' | 'master') => setFormData({...formData, ruolo: value})}>
+                        <SelectTrigger className="rounded-2xl">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="back office">Back Office</SelectItem>
+                          <SelectItem value="consulente">Consulente</SelectItem>
+                          <SelectItem value="master">Master</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center space-x-2 pt-6">
+                      <Switch
+                        id="edit-stato"
+                        checked={formData.stato}
+                        onCheckedChange={(checked) => setFormData({...formData, stato: checked})}
+                      />
+                      <Label htmlFor="edit-stato">Utente attivo</Label>
+                    </div>
+                  </div>
+
+                  {/* Rest of form fields - similar to create modal */}
+                  {formData.ruolo === 'consulente' && masters.length > 0 && (
+                    <div className="space-y-4 p-4 bg-gray-50 rounded-2xl">
+                      <h4 className="font-semibold text-gray-900">Master di Riferimento</h4>
+                      <div>
+                        <Label htmlFor="edit-master">Master</Label>
+                        <Select
+                          value={formData.master}
+                          onValueChange={(value) => setFormData({ ...formData, master: value })}
+                        >
+                          <SelectTrigger className="rounded-2xl">
+                            <SelectValue placeholder="Seleziona Master" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {masters.map((master) => (
+                              <SelectItem key={master.id} value={master.id}>
+                                {master.nome} {master.cognome}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+
+                  {(formData.ruolo === 'consulente' || formData.ruolo === 'master') && (
+                    <div className="space-y-4 p-4 bg-gray-50 rounded-2xl">
+                      <h4 className="font-semibold text-gray-900">
+                        Configurazione {formData.ruolo === 'consulente' ? 'Consulente' : 'Master'}
+                      </h4>
+
+                      <div>
+                        <Label htmlFor="edit-pianoCompensi">Piano Compensi</Label>
+                        <Select
+                          value={formData.pianoCompensi}
+                          onValueChange={(value) => setFormData({ ...formData, pianoCompensi: value })}
+                        >
+                          <SelectTrigger className="rounded-2xl">
+                            <SelectValue placeholder="Seleziona piano" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {AVAILABLE_PLANET_NAMES.map(name => (
+                              <SelectItem key={name} value={name}>
+                                {name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label>Gestori Assegnati</Label>
+                        <div className="grid grid-cols-3 gap-3 mt-2 max-h-64 overflow-y-auto p-2 border rounded-lg bg-white">
+                          {AVAILABLE_GESTORI.map((gestore) => (
+                            <div key={gestore} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`edit-${gestore}`}
+                                checked={formData.gestoriAssegnati.includes(gestore)}
+                                onCheckedChange={() => handleGestoreToggle(gestore)}
+                              />
+                              <Label htmlFor={`edit-${gestore}`} className="text-sm leading-tight">{gestore}</Label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+                    Annulla
+                  </Button>
+                  <Button
+                    onClick={handleUpdateUser}
+                    style={{ backgroundColor: '#F2C927', color: '#333333' }}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Aggiorna Utente
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+              <DialogContent className="sm:max-w-md font-roboto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Trash2 className="h-5 w-5 text-red-600" />
+                    Conferma Eliminazione
+                  </DialogTitle>
+                  <DialogDescription>
+                    Sei sicuro di voler eliminare l'utente <strong>{selectedUser?.nome}</strong>?
+                    <br />
+                    <span className="text-red-600">Questa azione non può essere annullata.</span>
+                  </DialogDescription>
+                </DialogHeader>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                    Annulla
+                  </Button>
+                  <Button
+                    onClick={confirmDeleteUser}
+                    variant="destructive"
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Elimina Utente
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
 
           {/* Filtri */}
