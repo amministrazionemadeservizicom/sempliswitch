@@ -28,17 +28,32 @@ export async function safeTerminate() {
 export async function getOcrWorker(lang = "ita+eng") {
   if (ocrWorker) return ocrWorker;
 
-  ocrWorker = await createWorker({ logger: () => {} });
+  console.log('🚀 Inizializzazione OCR worker...');
 
-  await ocrWorker.loadLanguage(lang);
-  await ocrWorker.initialize(lang, OEM.LSTM_ONLY);
+  try {
+    ocrWorker = await createWorker({ logger: () => {} });
+    console.log('✅ OCR worker creato');
 
-  await ocrWorker.setParameters({
-    user_defined_dpi: "300",
-    tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/-. :,;'()[]{}",
-  });
+    console.log('📚 Caricamento lingua:', lang);
+    await ocrWorker.loadLanguage(lang);
+    console.log('✅ Lingua caricata');
 
-  return ocrWorker;
+    console.log('🔧 Inizializzazione OCR...');
+    await ocrWorker.initialize(lang, OEM.LSTM_ONLY);
+    console.log('✅ OCR inizializzato');
+
+    console.log('⚙️ Configurazione parametri...');
+    await ocrWorker.setParameters({
+      user_defined_dpi: "300",
+      tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/-. :,;'()[]{}",
+    });
+    console.log('✅ OCR worker pronto!');
+
+    return ocrWorker;
+  } catch (error) {
+    console.error('❌ Errore inizializzazione OCR worker:', error);
+    throw error;
+  }
 }
 
 // 🔥 Utility: canvas → Blob
