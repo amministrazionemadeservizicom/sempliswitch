@@ -637,7 +637,7 @@ export default function CompileContract() {
       };
       
       // Save to Firebase
-      if (!currentUser) {
+      if (!currentUser || !userData) {
         toast.error("Utente non autenticato");
         return;
       }
@@ -645,9 +645,9 @@ export default function CompileContract() {
       const result = await saveContract({
         contractData,
         userId: currentUser.uid,
-        userName: currentUser.displayName?.split(' ')[0] || 'Nome',
-        userSurname: currentUser.displayName?.split(' ')[1] || 'Cognome',
-        masterReference: '' // TODO: Get from user data if consulente
+        userName: userData.nome || 'Nome',
+        userSurname: userData.cognome || 'Cognome',
+        masterReference: userData.masterRiferimento || ''
       });
 
       // Clear cart
