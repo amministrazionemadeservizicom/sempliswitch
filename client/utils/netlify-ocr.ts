@@ -16,7 +16,6 @@ const OCR_ENDPOINT = 'https://sempliswitch.it/.netlify/functions/ocr';
 // OCR for identity documents using Netlify Functions
 export async function processDocumentOCR(files: File[]): Promise<{
   text: string;
-  detectedType: string;
   parsed: ParsedFields;
   previews: string[];
 }> {
