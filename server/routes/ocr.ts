@@ -130,21 +130,30 @@ export const handleBillOCR: RequestHandler = async (req, res) => {
     }
 
     const file = Array.isArray(req.files.file) ? req.files.file[0] : req.files.file;
-    
+
     if (!file.data) {
       return res.status(400).json({ error: "Invalid file data" });
     }
 
+    // Check if Google Cloud Vision is properly configured
+    if (!visionClient) {
+      console.error("Google Cloud Vision not configured, returning error to trigger client fallback");
+      return res.status(503).json({
+        error: "Google Cloud Vision not configured",
+        details: "OCR service temporarily unavailable"
+      });
+    }
+
     // Extract text using Google Cloud Vision
     const extractedText = await extractTextFromBuffer(file.data);
-    
+
     if (!extractedText.trim()) {
       return res.status(400).json({ error: "No text detected in bill" });
     }
 
     // Parse bill data
     const { addr, capCitta, pod, pdr, potenzaImpegnata } = parseBillData(extractedText);
-    
+
     // Try to extract addresses
     const residenzaAddr = addr("RESIDENZA") || addr("DOMICILIO") || addr("INTESTATARIO");
     const fornituraAddr = addr("FORNITURA") || addr("UTENZA") || addr("CONTATORE");
@@ -173,9 +182,9 @@ export const handleBillOCR: RequestHandler = async (req, res) => {
 
   } catch (error: any) {
     console.error("Bill OCR error:", error);
-    res.status(500).json({ 
-      error: "OCR processing failed", 
-      details: error.message 
+    res.status(500).json({
+      error: "OCR processing failed",
+      details: error.message
     });
   }
 };
