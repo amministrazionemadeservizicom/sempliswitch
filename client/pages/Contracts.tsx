@@ -292,28 +292,61 @@ export default function Contracts() {
               </Button>
             </Link>
 
-            {/* Firebase Test Button (only for admin) */}
+            {/* Firebase Test Buttons (only for admin) */}
             {userRole === 'admin' && (
-              <Button
-                variant="outline"
-                onClick={async () => {
-                  const result = await testFirebaseConnection();
-                  if (result.success) {
-                    toast({
-                      title: "✅ Firebase OK",
-                      description: `Connessione riuscita. ${result.documentsCount} contratti trovati.`
-                    });
-                  } else {
-                    toast({
-                      variant: "destructive",
-                      title: "❌ Firebase Error",
-                      description: result.error
-                    });
-                  }
-                }}
-              >
-                🔥 Test Firebase
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    const result = await testFirebaseConnection();
+                    if (result.success) {
+                      toast({
+                        title: "✅ Firebase Client OK",
+                        description: `Connessione riuscita. ${result.documentsCount} contratti trovati.`
+                      });
+                    } else {
+                      toast({
+                        variant: "destructive",
+                        title: "❌ Firebase Error",
+                        description: result.error
+                      });
+                    }
+                  }}
+                >
+                  🔥 Test Client
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('/.netlify/functions/test-firebase-admin');
+                      const result = await response.json();
+
+                      if (result.success) {
+                        toast({
+                          title: "✅ Firebase Admin OK",
+                          description: `Admin SDK funzionante. ${result.tests.firestore.contractsInDatabase} contratti.`
+                        });
+                      } else {
+                        toast({
+                          variant: "destructive",
+                          title: "❌ Firebase Admin Error",
+                          description: result.error
+                        });
+                      }
+                    } catch (error: any) {
+                      toast({
+                        variant: "destructive",
+                        title: "❌ Admin Test Failed",
+                        description: error.message
+                      });
+                    }
+                  }}
+                >
+                  🔧 Test Admin
+                </Button>
+              </div>
             )}
           </div>
 
