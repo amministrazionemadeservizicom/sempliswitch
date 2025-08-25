@@ -228,6 +228,7 @@ export default function CompileContract() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [docPreviews, setDocPreviews] = useState<string[]>([]);
   const [billPreviews, setBillPreviews] = useState<string[]>([]);
+  const [ocrSource, setOcrSource] = useState<{ doc?: 'google' | 'tesseract'; bill?: 'google' | 'tesseract' }>({});
   
   const selectedOffer = selectedOffers[0]; // Use first offer for validation logic
   
