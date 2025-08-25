@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import Sidebar from "./Sidebar";
-import ProfileModal from "./ProfileModal";
 import { Button } from "@/components/ui/button";
 import { LogOut, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -22,7 +21,6 @@ export default function AppLayout({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userFullName, setUserFullName] = useState<string>("");
   const [userData, setUserData] = useState<any>(null);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -58,13 +56,6 @@ export default function AppLayout({
     fetchUserData();
   }, []);
 
-  const handleUserDataUpdate = (updatedData: any) => {
-    setUserData(updatedData);
-    const fullName = updatedData.fullName ||
-                      (updatedData.nome && updatedData.cognome ? `${updatedData.nome} ${updatedData.cognome}` : null) ||
-                     "Utente";
-    setUserFullName(fullName);
-  };
 
   const handleUserClick = () => {
     navigate('/profile');
@@ -163,13 +154,6 @@ export default function AppLayout({
         </main>
       </div>
 
-      {/* Profile Modal */}
-      <ProfileModal
-        isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-        userData={userData}
-        onUserDataUpdate={handleUserDataUpdate}
-      />
     </div>
   );
 }
