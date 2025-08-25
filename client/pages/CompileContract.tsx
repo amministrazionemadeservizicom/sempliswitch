@@ -697,7 +697,7 @@ export default function CompileContract() {
                   <Alert className="border-green-200 bg-green-50">
                     <CheckCircle className="h-4 w-4 text-green-600" />
                     <AlertDescription className="text-green-600">
-                      Documento elaborato con successo{ocrSource.doc && ` usando ${ocrSource.doc === 'google' ? 'Google Cloud Vision' : 'Tesseract.js'}`}. I campi sono stati compilati automaticamente.
+                      Documento elaborato con successo. I campi sono stati compilati automaticamente.
                     </AlertDescription>
                   </Alert>
                 )}
