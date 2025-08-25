@@ -31,7 +31,6 @@ import {
   AlertCircle,
 } from "lucide-react";
 // Rimosso: ora usiamo Netlify OCR
-import { detectDocType } from "@/utils/id-parsers";
 import { processDocumentOCR, processBillOCR } from "@/utils/netlify-ocr";
 
 // Regex patterns
