@@ -166,10 +166,23 @@ async function extractFromPDF(file: File) {
 
 // 🔥 Gestione immagini veloce
 async function extractFromImage(file: File) {
-  const url = URL.createObjectURL(file);
-  const canvas = await canvasFromImage(file);
-  const result = await runWithTimeout(fastOCR(canvas), 10000); // Ridotto a 10s
-  return { text: result.text, previewUrls: [url] };
+  console.log('🖼️ extractFromImage start for:', file.name);
+
+  try {
+    const url = URL.createObjectURL(file);
+    console.log('🖼️ Canvas creation...');
+    const canvas = await canvasFromImage(file);
+    console.log('🖼️ Canvas created, size:', canvas.width, 'x', canvas.height);
+
+    console.log('🖼️ Running OCR...');
+    const result = await runWithTimeout(fastOCR(canvas), 10000); // Ridotto a 10s
+    console.log('🖼️ OCR completed, text length:', result.text.length, 'confidence:', result.conf);
+
+    return { text: result.text, previewUrls: [url] };
+  } catch (error) {
+    console.error('❌ Error in extractFromImage:', error);
+    throw error;
+  }
 }
 
 // 🔥 Funzione principale ottimizzata
