@@ -373,8 +373,11 @@ export default function CompileContract() {
 
     setOcrLoading(true);
     try {
-      const { text, detectedType, parsed, previews } = await processDocumentOCR(Array.from(files));
+      const { text, parsed, previews } = await processDocumentOCR(Array.from(files));
       setDocPreviews(prev => [...prev, ...previews]);
+
+      // Detect document type locally
+      const detectedType = detectDocType(text);
 
       // Debug: log extracted text
       console.log("📄 Testo estratto OCR:", text);
@@ -405,7 +408,7 @@ export default function CompileContract() {
       }
       if (parsed.scadenza) {
         setValue("docScadenza", parsed.scadenza);
-        console.log("✅ Scadenza compilata:", parsed.scadenza);
+        console.log("��� Scadenza compilata:", parsed.scadenza);
         filledFields++;
       }
 
