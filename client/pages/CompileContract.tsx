@@ -33,10 +33,12 @@ import {
 // Rimosso: ora usiamo Netlify OCR
 import { processDocumentOCR, processBillOCR } from "@/utils/netlify-ocr";
 import { useCamera } from "@/hooks/useCamera";
+import { saveContract } from "@/lib/saveContract";
+import { useAuth } from "@/hooks/useAuth";
 
 // Regex patterns
 const CF_REGEX = /^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/;
-const IBAN_IT_REGEX = /^IT\d{2}[A-Z]\d{3}\d{4}\d{12}$/;
+const IBAN_IT_REGEX = /^IT\d{2}[A-Z0-9]{23}$/;
 
 // Types
 interface Offer {
@@ -218,6 +220,7 @@ function parseBillData(text: string) {
 
 export default function CompileContract() {
   const navigate = useNavigate();
+  const { user: currentUser, userData } = useAuth();
   const [selectedOffers, setSelectedOffers] = useState<Offer[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -402,7 +405,7 @@ export default function CompileContract() {
       }
       if (parsed.numeroDocumento) {
         setValue("docNumero", parsed.numeroDocumento);
-        console.log("✅ Numero documento compilato:", parsed.numeroDocumento);
+        console.log("�� Numero documento compilato:", parsed.numeroDocumento);
         filledFields++;
       }
       if (parsed.scadenza) {
@@ -633,24 +636,25 @@ export default function CompileContract() {
         offerte: selectedOffers
       };
       
-      // Save to localStorage (in real app would be database)
-      const existingContracts = JSON.parse(localStorage.getItem('contracts') || '[]');
-      const newContract = {
-        ...contractData,
-        id: Date.now().toString(),
-        consulenteId: 'user1',
-        stato: 'da_verificare',
-        dataCreazione: new Date().toISOString(),
-        ultimaModifica: new Date().toISOString()
-      };
-      existingContracts.push(newContract);
-      localStorage.setItem('contracts', JSON.stringify(existingContracts));
-      
+      // Save to Firebase
+      if (!currentUser || !userData) {
+        toast.error("Utente non autenticato");
+        return;
+      }
+
+      const result = await saveContract({
+        contractData,
+        userId: currentUser.uid,
+        userName: userData.nome || 'Nome',
+        userSurname: userData.cognome || 'Cognome',
+        masterReference: userData.masterRiferimento || ''
+      });
+
       // Clear cart
       localStorage.removeItem('selectedOffers');
       localStorage.removeItem('selectedOffer');
-      
-      toast.success("Contratto inviato con successo!");
+
+      toast.success(`Contratto salvato con successo! Codice: ${result.codiceUnivocoOfferta}`);
       navigate("/contracts");
       
     } catch (error) {

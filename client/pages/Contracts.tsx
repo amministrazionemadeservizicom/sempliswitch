@@ -25,6 +25,8 @@ import {
   Calendar
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { testFirebaseConnection } from "../utils/firebase-test";
+import { adminApi } from "../utils/admin-api";
 
 interface Contract {
   id: string;
@@ -64,134 +66,127 @@ export default function Contracts() {
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [noteText, setNoteText] = useState('');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingContract, setEditingContract] = useState<Contract | null>(null);
+  const [editContractData, setEditContractData] = useState({
+    statoOfferta: '' as Contract['statoOfferta'],
+    noteStatoOfferta: '',
+    contatto: { nome: '', cognome: '', codiceFiscale: '' },
+    ragioneSociale: ''
+  });
 
   useEffect(() => {
-    const fetchContracts = async () => {
-      try {
-        setLoading(true);
-        console.log("🔄 Caricamento contratti da Firebase...");
-        
-        if (!db) {
-          console.warn("⚠️ Database Firebase non configurato, utilizzo dati mock");
-          const mockContracts: Contract[] = [
-            {
-              id: '1',
-              codiceUnivocoOfferta: 'OFF-2024-001',
-              dataCreazione: '2024-03-15',
-              creatoDa: {
-                id: 'cons-1',
-                nome: 'Mario',
-                cognome: 'Rossi'
-              },
-              contatto: {
-                nome: 'Giuseppe',
-                cognome: 'Verdi',
-                codiceFiscale: 'VRDGPP80A01H501Z'
-              },
-              ragioneSociale: 'Verdi SRL',
-              isBusiness: true,
-              statoOfferta: 'Inserimento OK',
-              noteStatoOfferta: 'Contratto verificato e approvato',
-              gestore: 'ENEL',
-              filePath: '/contratti/ENEL/OFF-2024-001.pdf',
-              masterReference: 'master-1',
-              tipologiaContratto: 'energia'
-            },
-            {
-              id: '2',
-              codiceUnivocoOfferta: 'OFF-2024-002',
-              dataCreazione: '2024-03-14',
-              creatoDa: {
-                id: 'cons-2',
-                nome: 'Giulia',
-                cognome: 'Bianchi'
-              },
-              contatto: {
-                nome: 'Francesco',
-                cognome: 'Neri',
-                codiceFiscale: 'NREFNC75B15F205X'
-              },
-              isBusiness: false,
-              statoOfferta: 'Caricato',
-              noteStatoOfferta: '',
-              gestore: 'SORGENIA',
-              filePath: '/contratti/SORGENIA/OFF-2024-002.pdf',
-              tipologiaContratto: 'energia'
-            },
-            {
-              id: '3',
-              codiceUnivocoOfferta: 'TEL-2024-001',
-              dataCreazione: '2024-03-13',
-              creatoDa: {
-                id: 'cons-1',
-                nome: 'Mario',
-                cognome: 'Rossi'
-              },
-              contatto: {
-                nome: 'Anna',
-                cognome: 'Blu',
-                codiceFiscale: 'BLUANA85C45H501W'
-              },
-              ragioneSociale: 'Blu Communications SPA',
-              isBusiness: true,
-              statoOfferta: 'Pagato',
-              noteStatoOfferta: 'Pagamento ricevuto - attivazione in corso',
-              gestore: 'TIM',
-              filePath: '/contratti/TIM/TEL-2024-001.pdf',
-              tipologiaContratto: 'telefonia'
-            },
-            {
-              id: '4',
-              codiceUnivocoOfferta: 'OFF-2024-003',
-              dataCreazione: '2024-03-12',
-              creatoDa: {
-                id: 'cons-3',
-                nome: 'Paolo',
-                cognome: 'Verde'
-              },
-              contatto: {
-                nome: 'Lucia',
-                cognome: 'Rosa',
-                codiceFiscale: 'RSOLCU90D25F839Y'
-              },
-              isBusiness: false,
-              statoOfferta: 'Annullato',
-              noteStatoOfferta: 'Cliente ha revocato la richiesta',
-              gestore: 'ENI',
-              filePath: '/contratti/ENI/OFF-2024-003.pdf',
-              masterReference: 'master-2',
-              tipologiaContratto: 'energia'
-            }
-          ];
-          setContracts(mockContracts);
-          setLoading(false);
-          return;
-        }
+    const runFirebaseTest = async () => {
+      const testResult = await testFirebaseConnection();
+      console.log("🧪 Firebase test result:", testResult);
 
-        const querySnapshot = await getDocs(collection(db, "contratti"));
-        console.log("📊 Contratti trovati:", querySnapshot.size);
-        
-        const contractsFromFirebase: Contract[] = querySnapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            codiceUnivocoOfferta: data.codiceUnivocoOfferta || '',
-            dataCreazione: data.dataCreazione || '',
-            creatoDa: data.creatoDa || { id: '', nome: '', cognome: '' },
-            contatto: data.contatto || { nome: '', cognome: '', codiceFiscale: '' },
-            ragioneSociale: data.ragioneSociale || '',
-            isBusiness: data.isBusiness || false,
-            statoOfferta: data.statoOfferta || 'Caricato',
-            noteStatoOfferta: data.noteStatoOfferta || '',
-            gestore: data.gestore || '',
-            filePath: data.filePath || '',
-            masterReference: data.masterReference || '',
-            tipologiaContratto: data.tipologiaContratto || 'energia'
-          };
+      if (!testResult.success) {
+        toast({
+          variant: "destructive",
+          title: "Problema Firebase",
+          description: testResult.error || "Errore nella connessione Firebase"
         });
-        
-        setContracts(contractsFromFirebase);
-        console.log("✅ CONTRATTI CARICATI CON SUCCESSO:", contractsFromFirebase);
+      }
+    };
+
+    const fetchContracts = async () => {
+    try {
+      setLoading(true);
+      console.log("🔄 Caricamento contratti da Firebase...");
+      console.log("🔥 Firebase DB object:", db);
+      console.log("👤 Current user:", currentUser);
+      console.log("🔑 User role:", userRole);
+
+      if (!db) {
+        console.warn("⚠️ Database Firebase non configurato");
+        toast({
+          variant: "destructive",
+          title: "Errore di configurazione",
+          description: "Database Firebase non configurato correttamente"
+        });
+        setContracts([]);
+        setLoading(false);
+        return;
+      }
+
+      // Try Admin API first for better security and consistency
+      try {
+        console.log("📡 Attempting to fetch contracts via Admin API...");
+        const contractsFromAdmin = await adminApi.getAllContracts();
+        console.log("📊 Contratti trovati via Admin API:", contractsFromAdmin.length);
+
+        const formattedContracts: Contract[] = contractsFromAdmin.map((doc: any) => ({
+          id: doc.id,
+          codiceUnivocoOfferta: doc.codiceUnivocoOfferta || '',
+          dataCreazione: doc.dataCreazione || '',
+          creatoDa: doc.creatoDa || { id: '', nome: '', cognome: '' },
+          contatto: doc.contatto || { nome: '', cognome: '', codiceFiscale: '' },
+          ragioneSociale: doc.ragioneSociale || '',
+          isBusiness: doc.isBusiness || false,
+          statoOfferta: doc.statoOfferta || 'Caricato',
+          noteStatoOfferta: doc.noteStatoOfferta || '',
+          gestore: doc.gestore || '',
+          filePath: doc.filePath || '',
+          masterReference: doc.masterReference || '',
+          tipologiaContratto: doc.tipologiaContratto || 'energia'
+        }));
+
+        setContracts(formattedContracts);
+        console.log("✅ CONTRATTI CARICATI CON SUCCESSO VIA ADMIN API:", formattedContracts);
+      } catch (adminError: any) {
+        console.warn("⚠️ Admin API failed, falling back to direct Firebase access:", adminError);
+
+        // Show user-friendly warning about reduced functionality
+        toast({
+          variant: "destructive",
+          title: "⚠️ Modalità ridotta",
+          description: "Le funzioni di amministrazione non sono disponibili. Alcune funzionalità potrebbero essere limitate."
+        });
+
+        try {
+          // Fallback to direct Firebase access
+          console.log("📡 Attempting to fetch from 'contracts' collection...");
+          const querySnapshot = await getDocs(collection(db, "contracts"));
+          console.log("📊 Contratti trovati:", querySnapshot.size);
+          console.log("📋 Query snapshot:", querySnapshot);
+
+          const contractsFromFirebase: Contract[] = querySnapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              codiceUnivocoOfferta: data.codiceUnivocoOfferta || '',
+              dataCreazione: data.dataCreazione || '',
+              creatoDa: data.creatoDa || { id: '', nome: '', cognome: '' },
+              contatto: data.contatto || { nome: '', cognome: '', codiceFiscale: '' },
+              ragioneSociale: data.ragioneSociale || '',
+              isBusiness: data.isBusiness || false,
+              statoOfferta: data.statoOfferta || 'Caricato',
+              noteStatoOfferta: data.noteStatoOfferta || '',
+              gestore: data.gestore || '',
+              filePath: data.filePath || '',
+              masterReference: data.masterReference || '',
+              tipologiaContratto: data.tipologiaContratto || 'energia'
+            };
+          });
+
+          setContracts(contractsFromFirebase);
+          console.log("✅ CONTRATTI CARICATI CON SUCCESSO:", contractsFromFirebase);
+
+          toast({
+            title: "✅ Dati caricati",
+            description: `${contractsFromFirebase.length} contratti caricati tramite accesso diretto`
+          });
+
+        } catch (fallbackError) {
+          console.error("❌ Fallback Firebase access also failed:", fallbackError);
+          toast({
+            variant: "destructive",
+            title: "Errore critico",
+            description: "Impossibile caricare i contratti. Verifica la connessione."
+          });
+          setContracts([]);
+        }
+      }
       } catch (error) {
         console.error("❌ Errore nel recupero contratti da Firebase:", error);
         toast({
@@ -204,6 +199,8 @@ export default function Contracts() {
       }
     };
 
+    // Run Firebase test first, then fetch contracts
+    runFirebaseTest();
     fetchContracts();
   }, []);
 
@@ -284,32 +281,102 @@ export default function Contracts() {
   };
 
   const handleEditContract = (contract: Contract) => {
-    // Navigazione alla pagina di modifica contratto
-    navigate(`/contracts/${contract.id}/edit`);
-  };
-
-  const handleDeleteContract = (contractId: string) => {
-    setContracts(contracts.filter(c => c.id !== contractId));
-    toast({
-      title: "Contratto eliminato",
-      description: "Il contratto è stato rimosso dal sistema",
+    setEditingContract(contract);
+    setEditContractData({
+      statoOfferta: contract.statoOfferta,
+      noteStatoOfferta: contract.noteStatoOfferta,
+      contatto: contract.contatto,
+      ragioneSociale: contract.ragioneSociale || ''
     });
+    setIsEditModalOpen(true);
   };
 
-  const handleUpdateNote = () => {
-    if (selectedContract) {
-      setContracts(contracts.map(c => 
-        c.id === selectedContract.id 
-          ? { ...c, noteStatoOfferta: noteText }
-          : c
-      ));
+  const handleDeleteContract = async (contractId: string) => {
+    try {
+      await adminApi.deleteContract(contractId);
+      setContracts(contracts.filter(c => c.id !== contractId));
       toast({
-        title: "Note aggiornate",
-        description: "Le note del contratto sono state salvate",
+        title: "Contratto eliminato",
+        description: "Il contratto è stato rimosso dal sistema",
       });
-      setIsNoteModalOpen(false);
-      setSelectedContract(null);
-      setNoteText('');
+    } catch (error: any) {
+      console.error('Error deleting contract:', error);
+      toast({
+        variant: "destructive",
+        title: "Errore",
+        description: "Impossibile eliminare il contratto",
+      });
+    }
+  };
+
+  const handleUpdateNote = async () => {
+    if (selectedContract) {
+      try {
+        await adminApi.updateContractStatus(
+          selectedContract.id,
+          selectedContract.statoOfferta,
+          noteText
+        );
+        setContracts(contracts.map(c =>
+          c.id === selectedContract.id
+            ? { ...c, noteStatoOfferta: noteText }
+            : c
+        ));
+        toast({
+          title: "Note aggiornate",
+          description: "Le note del contratto sono state salvate",
+        });
+        setIsNoteModalOpen(false);
+        setSelectedContract(null);
+        setNoteText('');
+      } catch (error: any) {
+        console.error('Error updating notes:', error);
+        toast({
+          variant: "destructive",
+          title: "Errore",
+          description: "Impossibile aggiornare le note",
+        });
+      }
+    }
+  };
+
+  const handleUpdateContract = async () => {
+    if (editingContract) {
+      try {
+        await adminApi.updateContract(editingContract.id, {
+          statoOfferta: editContractData.statoOfferta,
+          noteStatoOfferta: editContractData.noteStatoOfferta,
+          contatto: editContractData.contatto,
+          ragioneSociale: editContractData.ragioneSociale
+        });
+
+        setContracts(contracts.map(c =>
+          c.id === editingContract.id
+            ? {
+                ...c,
+                statoOfferta: editContractData.statoOfferta,
+                noteStatoOfferta: editContractData.noteStatoOfferta,
+                contatto: editContractData.contatto,
+                ragioneSociale: editContractData.ragioneSociale
+              }
+            : c
+        ));
+
+        toast({
+          title: "Contratto aggiornato",
+          description: "Le modifiche sono state salvate con successo",
+        });
+
+        setIsEditModalOpen(false);
+        setEditingContract(null);
+      } catch (error: any) {
+        console.error('Error updating contract:', error);
+        toast({
+          variant: "destructive",
+          title: "Errore",
+          description: "Impossibile aggiornare il contratto",
+        });
+      }
     }
   };
 
@@ -346,8 +413,8 @@ export default function Contracts() {
               </p>
             </div>
             
-            <Link to="/new-practice">
-              <Button 
+            <Link to="/compile-contract">
+              <Button
                 className="shadow-md"
                 style={{ backgroundColor: '#F2C927', color: '#333333' }}
               >
@@ -355,6 +422,63 @@ export default function Contracts() {
                 Nuovo Contratto
               </Button>
             </Link>
+
+            {/* Firebase Test Buttons (only for admin) */}
+            {userRole === 'admin' && (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    const result = await testFirebaseConnection();
+                    if (result.success) {
+                      toast({
+                        title: "✅ Firebase Client OK",
+                        description: `Connessione riuscita. ${result.documentsCount} contratti trovati.`
+                      });
+                    } else {
+                      toast({
+                        variant: "destructive",
+                        title: "❌ Firebase Error",
+                        description: result.error
+                      });
+                    }
+                  }}
+                >
+                  🔥 Test Client
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('/.netlify/functions/test-firebase-admin');
+                      const result = await response.json();
+
+                      if (result.success) {
+                        toast({
+                          title: "✅ Firebase Admin OK",
+                          description: `Admin SDK funzionante. ${result.tests.firestore.contractsInDatabase} contratti.`
+                        });
+                      } else {
+                        toast({
+                          variant: "destructive",
+                          title: "❌ Firebase Admin Error",
+                          description: result.error
+                        });
+                      }
+                    } catch (error: any) {
+                      toast({
+                        variant: "destructive",
+                        title: "❌ Admin Test Failed",
+                        description: error.message
+                      });
+                    }
+                  }}
+                >
+                  🔧 Test Admin
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Barra di ricerca principale */}
@@ -678,6 +802,124 @@ export default function Contracts() {
                   style={{ backgroundColor: '#F2C927', color: '#333333' }}
                 >
                   Salva Note
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Modal per modifica contratto */}
+          <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+            <DialogContent className="sm:max-w-2xl font-roboto">
+              <DialogHeader>
+                <DialogTitle>Modifica Contratto</DialogTitle>
+                <DialogDescription>
+                  Contratto: {editingContract?.codiceUnivocoOfferta}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-4 max-h-96 overflow-y-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="editNome">Nome</Label>
+                    <Input
+                      id="editNome"
+                      value={editContractData.contatto.nome}
+                      onChange={(e) => setEditContractData({
+                        ...editContractData,
+                        contatto: { ...editContractData.contatto, nome: e.target.value }
+                      })}
+                      className="rounded-2xl"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="editCognome">Cognome</Label>
+                    <Input
+                      id="editCognome"
+                      value={editContractData.contatto.cognome}
+                      onChange={(e) => setEditContractData({
+                        ...editContractData,
+                        contatto: { ...editContractData.contatto, cognome: e.target.value }
+                      })}
+                      className="rounded-2xl"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="editCodiceFiscale">Codice Fiscale</Label>
+                  <Input
+                    id="editCodiceFiscale"
+                    value={editContractData.contatto.codiceFiscale}
+                    onChange={(e) => setEditContractData({
+                      ...editContractData,
+                      contatto: { ...editContractData.contatto, codiceFiscale: e.target.value }
+                    })}
+                    className="rounded-2xl"
+                  />
+                </div>
+
+                {editingContract?.isBusiness && (
+                  <div>
+                    <Label htmlFor="editRagioneSociale">Ragione Sociale</Label>
+                    <Input
+                      id="editRagioneSociale"
+                      value={editContractData.ragioneSociale}
+                      onChange={(e) => setEditContractData({
+                        ...editContractData,
+                        ragioneSociale: e.target.value
+                      })}
+                      className="rounded-2xl"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <Label htmlFor="editStato">Stato Offerta</Label>
+                  <Select
+                    value={editContractData.statoOfferta}
+                    onValueChange={(value: Contract['statoOfferta']) =>
+                      setEditContractData({ ...editContractData, statoOfferta: value })
+                    }
+                  >
+                    <SelectTrigger className="rounded-2xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Caricato">Caricato</SelectItem>
+                      <SelectItem value="Inserito">Inserito</SelectItem>
+                      <SelectItem value="Inserimento OK">Inserimento OK</SelectItem>
+                      <SelectItem value="Pagato">Pagato</SelectItem>
+                      <SelectItem value="Annullato">Annullato</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="editNote">Note Stato Offerta</Label>
+                  <Textarea
+                    id="editNote"
+                    value={editContractData.noteStatoOfferta}
+                    onChange={(e) => setEditContractData({
+                      ...editContractData,
+                      noteStatoOfferta: e.target.value
+                    })}
+                    placeholder="Inserisci note..."
+                    className="rounded-2xl"
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+                  Annulla
+                </Button>
+                <Button
+                  onClick={handleUpdateContract}
+                  style={{ backgroundColor: '#F2C927', color: '#333333' }}
+                >
+                  Salva Modifiche
                 </Button>
               </DialogFooter>
             </DialogContent>

@@ -48,6 +48,9 @@ export default function Users() {
   const [masters, setMasters] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -77,98 +80,166 @@ export default function Users() {
     console.log("Visualizza utente:", user);
   };
 
-  const handleEditUser = (user: any) => {
-    console.log("Modifica utente:", user);
+  const handleEditUser = (user: User) => {
+    setSelectedUser(user);
+    // Pre-fill form with user data
+    setFormData({
+      nome: user.nome,
+      email: user.email,
+      password: '', // Don't pre-fill password for security
+      ruolo: user.ruolo,
+      stato: user.stato === 'attivo',
+      pianoCompensi: user.pianoCompensi || '',
+      gestoriAssegnati: user.gestoriAssegnati || [],
+      master: user.master || ''
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleDeleteUser = (user: User) => {
+    setSelectedUser(user);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!selectedUser) return;
+
+    try {
+      // For now, just remove from local state
+      // In production, this would call an API to delete from Firebase
+      setUsers(users.filter(u => u.id !== selectedUser.id));
+
+      toast({
+        title: "Utente eliminato",
+        description: `L'utente ${selectedUser.nome} è stato rimosso dal sistema`,
+      });
+
+      setIsDeleteDialogOpen(false);
+      setSelectedUser(null);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Errore",
+        description: "Impossibile eliminare l'utente"
+      });
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+
+      if (!db) {
+        // Fallback to mock data if Firebase not configured
+        const mockUsers: User[] = [
+          {
+            id: '1',
+            nome: 'Marco Amministratore',
+            email: 'marco.admin@sempliswitch.com',
+            ruolo: 'admin',
+            stato: 'attivo',
+            createdAt: '2024-01-15',
+            lastLogin: '2024-03-15'
+          },
+          {
+            id: '2',
+            nome: 'Giulia Supporto',
+            email: 'giulia.supporto@sempliswitch.com',
+            ruolo: 'back office',
+            stato: 'attivo',
+            createdAt: '2024-01-20',
+            lastLogin: '2024-03-14'
+          }
+        ];
+        setUsers(mockUsers);
+        setLoading(false);
+        return;
+      }
+
+      const querySnapshot = await getDocs(collection(db, "utenti"));
+      const usersFromFirebase: User[] = querySnapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          nome: `${data.nome || ''} ${data.cognome || ''}`.trim(),
+          email: data.email || '',
+          ruolo: (data.ruolo as "admin" | "back office" | "consulente" | "master") || 'consulente',
+          stato: data.attivo ? "attivo" as const : "non attivo" as const,
+          pianoCompensi: data.pianoCompensi || "",
+          gestoriAssegnati: data.gestoriAssegnati || [],
+          master: data.master || '',
+          createdAt: data.createdAt || "",
+          lastLogin: data.lastLogin || ""
+        } as User;
+      });
+
+      const cleanedUsers = usersFromFirebase.filter(user =>
+        user.email && !user.email.includes('"') && !user.email.includes('*')
+      );
+      setUsers(cleanedUsers);
+    } catch (error) {
+      console.error("Errore nel recupero utenti da Firebase:", error);
+      toast({
+        variant: "destructive",
+        title: "Errore",
+        description: "Impossibile caricare gli utenti da Firebase"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMasters = async () => {
+    try {
+      if (!db) {
+        setMasters([]);
+        return;
+      }
+
+      const q = query(collection(db, "utenti"), where("ruolo", "==", "master"));
+      const querySnapshot = await getDocs(q);
+      const mastersData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        nome: doc.data().nome,
+        cognome: doc.data().cognome || '',
+      }));
+      setMasters(mastersData);
+    } catch (error) {
+      console.error("Errore nel recupero dei master:", error);
+    }
   };
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        setLoading(true);
-
-        if (!db) {
-          // Fallback to mock data if Firebase not configured
-          const mockUsers: User[] = [
-            {
-              id: '1',
-              nome: 'Marco Amministratore',
-              email: 'marco.admin@sempliswitch.com',
-              ruolo: 'admin',
-              stato: 'attivo',
-              createdAt: '2024-01-15',
-              lastLogin: '2024-03-15'
-            },
-            {
-              id: '2',
-              nome: 'Giulia Supporto',
-              email: 'giulia.supporto@sempliswitch.com',
-              ruolo: 'back office',
-              stato: 'attivo',
-              createdAt: '2024-01-20',
-              lastLogin: '2024-03-14'
-            }
-          ];
-          setUsers(mockUsers);
-          setLoading(false);
-          return;
-        }
-
-        const querySnapshot = await getDocs(collection(db, "utenti"));
-        const usersFromFirebase: User[] = querySnapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            nome: `${data.nome || ''} ${data.cognome || ''}`.trim(),
-            email: data.email || '',
-            ruolo: data.ruolo || 'consulente',
-            stato: data.attivo ? "attivo" : "non attivo",
-            pianoCompensi: data.pianoCompensi || "",
-            gestoriAssegnati: data.gestoriAssegnati || [],
-            master: data.master || '',
-            createdAt: data.createdAt || "",
-            lastLogin: data.lastLogin || ""
-          };
-        });
-
-        const cleanedUsers = usersFromFirebase.filter(user =>
-          user.email && !user.email.includes('"') && !user.email.includes('*')
-        );
-        setUsers(cleanedUsers);
-      } catch (error) {
-        console.error("Errore nel recupero utenti da Firebase:", error);
-        toast({
-          variant: "destructive",
-          title: "Errore",
-          description: "Impossibile caricare gli utenti da Firebase"
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const fetchMasters = async () => {
-      try {
-        if (!db) {
-          setMasters([]);
-          return;
-        }
-
-        const q = query(collection(db, "utenti"), where("ruolo", "==", "master"));
-        const querySnapshot = await getDocs(q);
-        const mastersData = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          nome: doc.data().nome,
-          cognome: doc.data().cognome || '',
-        }));
-        setMasters(mastersData);
-      } catch (error) {
-        console.error("Errore nel recupero dei master:", error);
-      }
-    };
-
     fetchUsers();
     fetchMasters();
   }, []);
+
+  // Show loading while auth is being determined
+  if (userRole === null) {
+    return (
+      <div className="min-h-screen bg-white font-roboto flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Verifica autorizzazioni...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show access denied if not admin
+  if (userRole !== "admin") {
+    return (
+      <div className="min-h-screen bg-white font-roboto flex items-center justify-center">
+        <div className="text-center">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-8 max-w-md">
+            <h2 className="text-xl font-semibold text-red-800 mb-2">Accesso Negato</h2>
+            <p className="text-red-600">Questa pagina è riservata agli amministratori.</p>
+            <p className="text-sm text-red-500 mt-2">Ruolo attuale: {userRole || 'Non definito'}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const resetForm = () => {
     setFormData({
@@ -181,6 +252,7 @@ export default function Users() {
       gestoriAssegnati: [],
       master: ''
     });
+    setSelectedUser(null);
   };
 
   const utentiVisibili = Array.isArray(users) ? users : [];
@@ -203,6 +275,8 @@ export default function Users() {
       });
       setIsCreateModalOpen(false);
       resetForm();
+      // Refresh the user list to show the newly created user
+      await fetchUsers();
     } catch (err) {
       toast({
         variant: "destructive",
@@ -212,12 +286,52 @@ export default function Users() {
     }
   };
 
-  const handleDeleteUser = (userId: string) => {
-    setUsers(users.filter(u => u.id !== userId));
-    toast({
-      title: "Utente eliminato",
-      description: "L'utente è stato rimosso dal sistema",
-    });
+  const handleUpdateUser = async () => {
+    if (!formData.nome || !formData.email) {
+      toast({
+        variant: "destructive",
+        title: "Errore",
+        description: "Compila tutti i campi obbligatori"
+      });
+      return;
+    }
+
+    if (!selectedUser) return;
+
+    try {
+      // For now, update local state
+      // In production, this would call an API to update in Firebase
+      const updatedUsers = users.map(user =>
+        user.id === selectedUser.id
+          ? {
+              ...user,
+              nome: formData.nome,
+              ruolo: formData.ruolo,
+              stato: formData.stato ? 'attivo' as const : 'non attivo' as const,
+              pianoCompensi: formData.pianoCompensi,
+              gestoriAssegnati: formData.gestoriAssegnati,
+              master: formData.master
+            } as User
+          : user
+      );
+
+      setUsers(updatedUsers);
+
+      toast({
+        title: "✅ Utente aggiornato con successo!",
+        description: `I dati di ${formData.nome} sono stati modificati`,
+      });
+
+      setIsEditModalOpen(false);
+      setSelectedUser(null);
+      resetForm();
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Errore",
+        description: "Aggiornamento utente fallito",
+      });
+    }
   };
 
   const getRoleBadge = (ruolo: User['ruolo']) => {
@@ -430,6 +544,187 @@ export default function Users() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            {/* Edit User Modal */}
+            <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+              <DialogContent className="sm:max-w-lg font-roboto max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Edit className="h-5 w-5" />
+                    Modifica Utente
+                  </DialogTitle>
+                  <DialogDescription>
+                    Modifica i dati dell'utente selezionato
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-nome">Nome *</Label>
+                      <Input
+                        id="edit-nome"
+                        value={formData.nome}
+                        onChange={(e) => setFormData({...formData, nome: e.target.value})}
+                        placeholder="Mario Rossi"
+                        className="rounded-2xl"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-email">Email *</Label>
+                      <Input
+                        id="edit-email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({...formData, email: e.target.value})}
+                        placeholder="mario@sempliswitch.com"
+                        className="rounded-2xl"
+                        disabled
+                      />
+                      <p className="text-xs text-gray-500 mt-1">L'email non può essere modificata</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-ruolo">Ruolo</Label>
+                      <Select value={formData.ruolo} onValueChange={(value: 'admin' | 'back office' | 'consulente' | 'master') => setFormData({...formData, ruolo: value})}>
+                        <SelectTrigger className="rounded-2xl">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="back office">Back Office</SelectItem>
+                          <SelectItem value="consulente">Consulente</SelectItem>
+                          <SelectItem value="master">Master</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center space-x-2 pt-6">
+                      <Switch
+                        id="edit-stato"
+                        checked={formData.stato}
+                        onCheckedChange={(checked) => setFormData({...formData, stato: checked})}
+                      />
+                      <Label htmlFor="edit-stato">Utente attivo</Label>
+                    </div>
+                  </div>
+
+                  {/* Rest of form fields - similar to create modal */}
+                  {formData.ruolo === 'consulente' && masters.length > 0 && (
+                    <div className="space-y-4 p-4 bg-gray-50 rounded-2xl">
+                      <h4 className="font-semibold text-gray-900">Master di Riferimento</h4>
+                      <div>
+                        <Label htmlFor="edit-master">Master</Label>
+                        <Select
+                          value={formData.master}
+                          onValueChange={(value) => setFormData({ ...formData, master: value })}
+                        >
+                          <SelectTrigger className="rounded-2xl">
+                            <SelectValue placeholder="Seleziona Master" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {masters.map((master) => (
+                              <SelectItem key={master.id} value={master.id}>
+                                {master.nome} {master.cognome}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+
+                  {(formData.ruolo === 'consulente' || formData.ruolo === 'master') && (
+                    <div className="space-y-4 p-4 bg-gray-50 rounded-2xl">
+                      <h4 className="font-semibold text-gray-900">
+                        Configurazione {formData.ruolo === 'consulente' ? 'Consulente' : 'Master'}
+                      </h4>
+
+                      <div>
+                        <Label htmlFor="edit-pianoCompensi">Piano Compensi</Label>
+                        <Select
+                          value={formData.pianoCompensi}
+                          onValueChange={(value) => setFormData({ ...formData, pianoCompensi: value })}
+                        >
+                          <SelectTrigger className="rounded-2xl">
+                            <SelectValue placeholder="Seleziona piano" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {AVAILABLE_PLANET_NAMES.map(name => (
+                              <SelectItem key={name} value={name}>
+                                {name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label>Gestori Assegnati</Label>
+                        <div className="grid grid-cols-3 gap-3 mt-2 max-h-64 overflow-y-auto p-2 border rounded-lg bg-white">
+                          {AVAILABLE_GESTORI.map((gestore) => (
+                            <div key={gestore} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`edit-${gestore}`}
+                                checked={formData.gestoriAssegnati.includes(gestore)}
+                                onCheckedChange={() => handleGestoreToggle(gestore)}
+                              />
+                              <Label htmlFor={`edit-${gestore}`} className="text-sm leading-tight">{gestore}</Label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+                    Annulla
+                  </Button>
+                  <Button
+                    onClick={handleUpdateUser}
+                    style={{ backgroundColor: '#F2C927', color: '#333333' }}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Aggiorna Utente
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+              <DialogContent className="sm:max-w-md font-roboto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Trash2 className="h-5 w-5 text-red-600" />
+                    Conferma Eliminazione
+                  </DialogTitle>
+                  <DialogDescription>
+                    Sei sicuro di voler eliminare l'utente <strong>{selectedUser?.nome}</strong>?
+                    <br />
+                    <span className="text-red-600">Questa azione non può essere annullata.</span>
+                  </DialogDescription>
+                </DialogHeader>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                    Annulla
+                  </Button>
+                  <Button
+                    onClick={confirmDeleteUser}
+                    variant="destructive"
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Elimina Utente
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
 
           {/* Filtri */}
@@ -521,6 +816,7 @@ export default function Users() {
                           <TableHead>Email</TableHead>
                           <TableHead>Ruolo</TableHead>
                           <TableHead>Stato</TableHead>
+                          <TableHead>Azioni</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -535,6 +831,26 @@ export default function Users() {
                               ) : (
                                 <Badge variant="secondary">Non Attivo</Badge>
                               )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditUser(user)}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeleteUser(user)}
+                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -564,6 +880,27 @@ export default function Users() {
                               <span className="text-gray-500">Ruolo:</span>
                               <div className="mt-1">{getRoleBadge(user.ruolo)}</div>
                             </div>
+                          </div>
+
+                          <div className="flex gap-2 pt-3 border-t">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditUser(user)}
+                              className="flex-1"
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              Modifica
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteUser(user)}
+                              className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Elimina
+                            </Button>
                           </div>
                         </CardContent>
                       </Card>

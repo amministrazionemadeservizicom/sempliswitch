@@ -1,7 +1,3 @@
-import { auth, db } from "../firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-
 interface CreateUserInput {
   nome: string;
   cognome?: string;
@@ -22,39 +18,23 @@ interface CreateUserInput {
   master?: string;
 }
 
+import { adminApi } from "../utils/admin-api";
+
 export async function createAndSaveUser(input: CreateUserInput) {
   try {
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      input.email,
-      input.password
-    );
-
-    const uid = userCredential.user.uid;
-
-    await setDoc(doc(db, "utenti", uid), {
-      uid,
+    const result = await adminApi.createUser({
       nome: input.nome,
-      cognome: input.cognome || "",
       email: input.email,
+      password: input.password,
       ruolo: input.ruolo,
-      stato: input.stato ? "attivo" : "non attivo",
+      stato: input.stato,
       pianoCompensi: input.pianoCompensi || "",
       gestoriAssegnati: input.gestoriAssegnati || [],
-      ragioneSociale: input.ragioneSociale || "",
-      partitaIva: input.partitaIva || "",
-      codiceFiscale: input.codiceFiscale || "",
-      numeroCellulare: input.numeroCellulare || "",
-      indirizzo: input.indirizzo || "",
-      città: input.città || "",
-      provincia: input.provincia || "",
-      cap: input.cap || "",
-      masterRiferimento: input.master || "",
-      creatoIl: serverTimestamp(),
+      master: input.master || ""
     });
 
-    console.log("✅ Utente creato correttamente con UID:", uid);
-    return uid;
+    console.log("✅ Utente creato correttamente tramite Firebase Admin:", result);
+    return result.uid;
   } catch (error: any) {
     console.error("❌ Errore durante la creazione dell'utente:", error.message);
     throw error;
