@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import { ImageAnnotatorClient } from "@google-cloud/vision";
-import { detectDocType, parseFieldsByType } from "../../client/utils/id-parsers";
 import * as fileUpload from "express-fileupload";
 
 // Extend Express Request type to include files
