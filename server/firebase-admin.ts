@@ -102,6 +102,37 @@ export const adminOperations = {
     }
   },
 
+  // Update full contract with admin privileges
+  async updateContract(contractId: string, updateData: {
+    statoOfferta?: string;
+    noteStatoOfferta?: string;
+    contatto?: {
+      nome: string;
+      cognome: string;
+      codiceFiscale: string;
+    };
+    ragioneSociale?: string;
+  }) {
+    try {
+      const updateFields: any = {
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+
+      if (updateData.statoOfferta) updateFields.statoOfferta = updateData.statoOfferta;
+      if (updateData.noteStatoOfferta !== undefined) updateFields.noteStatoOfferta = updateData.noteStatoOfferta;
+      if (updateData.contatto) updateFields.contatto = updateData.contatto;
+      if (updateData.ragioneSociale !== undefined) updateFields.ragioneSociale = updateData.ragioneSociale;
+
+      await adminDb.collection('contratti').doc(contractId).update(updateFields);
+
+      console.log('✅ Contract updated:', contractId);
+      return true;
+    } catch (error) {
+      console.error('❌ Error updating contract:', error);
+      throw error;
+    }
+  },
+
   // Delete contract with admin privileges
   async deleteContract(contractId: string) {
     try {
