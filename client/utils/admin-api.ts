@@ -25,6 +25,43 @@ interface AdminApiInterface {
     gestoriAssegnati?: string[];
     master?: string;
   }): Promise<any>;
+  saveContract(contractData: {
+    cliente: {
+      nome: string;
+      cognome: string;
+      codiceFiscale: string;
+      cellulare: string;
+      email: string;
+      iban?: string;
+    };
+    documento: {
+      tipo: string;
+      numero?: string;
+      rilasciatoDa: string;
+      dataRilascio: string;
+      dataScadenza: string;
+    };
+    indirizzi: {
+      residenza: {
+        via: string;
+        civico: string;
+        citta: string;
+        cap: string;
+      };
+      fornitura: {
+        via: string;
+        civico: string;
+        citta: string;
+        cap: string;
+      };
+    };
+    pod?: string;
+    pdr?: string;
+    potenzaImpegnataKw?: number;
+    usiGas?: string[];
+    residenziale?: string;
+    offerte: any[];
+  }, userId: string, userName: string, userSurname: string, masterReference?: string): Promise<any>;
   testFirebaseAdmin(): Promise<any>;
 }
 
@@ -129,7 +166,7 @@ export const adminApi: AdminApiInterface = {
       const result = await response.json();
       return result;
     } catch (error: any) {
-      console.error('❌ Error deleting contract:', error);
+      console.error('��� Error deleting contract:', error);
       throw error;
     }
   },
