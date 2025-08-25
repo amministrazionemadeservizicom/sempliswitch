@@ -239,12 +239,22 @@ export default function Contracts() {
     setIsEditModalOpen(true);
   };
 
-  const handleDeleteContract = (contractId: string) => {
-    setContracts(contracts.filter(c => c.id !== contractId));
-    toast({
-      title: "Contratto eliminato",
-      description: "Il contratto �� stato rimosso dal sistema",
-    });
+  const handleDeleteContract = async (contractId: string) => {
+    try {
+      await adminApi.deleteContract(contractId);
+      setContracts(contracts.filter(c => c.id !== contractId));
+      toast({
+        title: "Contratto eliminato",
+        description: "Il contratto è stato rimosso dal sistema",
+      });
+    } catch (error: any) {
+      console.error('Error deleting contract:', error);
+      toast({
+        variant: "destructive",
+        title: "Errore",
+        description: "Impossibile eliminare il contratto",
+      });
+    }
   };
 
   const handleUpdateNote = () => {
