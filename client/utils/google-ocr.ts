@@ -60,19 +60,25 @@ export async function extractDocumentData(files: File[]): Promise<{
   source: 'google' | 'tesseract';
 }> {
   const previews = files.map(file => URL.createObjectURL(file));
-  
+
   try {
-    // Try Google OCR first
+    // Try Google OCR first with timeout
     const formData = createFormData(files);
-    
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
     const response = await fetch('/api/ocr/document', {
       method: 'POST',
-      body: formData
+      body: formData,
+      signal: controller.signal
     });
-    
+
+    clearTimeout(timeoutId);
+
     if (response.ok) {
       const result: GoogleOCRDocumentResponse = await response.json();
-      
+
       return {
         text: result.text,
         parsedFields: result.parsedFields,
@@ -81,16 +87,18 @@ export async function extractDocumentData(files: File[]): Promise<{
         source: 'google'
       };
     } else {
-      console.warn('Google OCR failed, falling back to Tesseract');
-      throw new Error('Google OCR failed');
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.warn('Google OCR failed:', response.status, errorText);
+      throw new Error(`Google OCR failed: ${response.status}`);
     }
   } catch (googleError) {
     console.warn('Google OCR error:', googleError);
-    
+
     try {
       // Fallback to Tesseract.js client-side OCR
+      console.log('Falling back to Tesseract.js...');
       const { text, previews: tesseractPreviews } = await tesseractOCR(files);
-      
+
       return {
         text,
         parsedFields: {}, // Tesseract doesn't parse fields directly
