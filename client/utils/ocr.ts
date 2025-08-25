@@ -119,18 +119,20 @@ async function fastOCR(canvas: HTMLCanvasElement) {
   }
 }
 
-// 🔥 Gestione PDF
+// 🔥 Gestione PDF veloce
 async function extractFromPDF(file: File) {
   const arrayBuf = await file.arrayBuffer();
   const pdf = await (pdfjsLib as any).getDocument({ data: arrayBuf }).promise;
 
   let fullText = "";
   const previews: string[] = [];
-  const psms = [PSM.SINGLE_BLOCK, PSM.AUTO, PSM.SPARSE_TEXT];
 
-  for (let i = 1; i <= pdf.numPages; i++) {
+  // Limita a max 3 pagine per velocità
+  const maxPages = Math.min(pdf.numPages, 3);
+
+  for (let i = 1; i <= maxPages; i++) {
     const page = await pdf.getPage(i);
-    const viewport = page.getViewport({ scale: 2.0 });
+    const viewport = page.getViewport({ scale: 1.5 }); // Ridotta da 2.0 a 1.5
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d")!;
     canvas.width = viewport.width;
@@ -140,7 +142,7 @@ async function extractFromPDF(file: File) {
     const url = canvas.toDataURL("image/png");
     previews.push(url);
 
-    const result = await runWithTimeout(tryRotations(canvas, psms), 30000);
+    const result = await runWithTimeout(fastOCR(canvas), 15000); // Ridotto da 30s a 15s
     fullText += `\n\n[Pagina ${i}]\n${result.text}`;
   }
 
