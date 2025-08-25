@@ -31,8 +31,8 @@ import {
   AlertCircle,
 } from "lucide-react";
 // Rimosso: ora usiamo Netlify OCR
+import { detectDocType } from "@/utils/id-parsers";
 import { processDocumentOCR, processBillOCR } from "@/utils/netlify-ocr";
-// detectDocType is now imported via netlify-ocr
 
 // Regex patterns
 const CF_REGEX = /^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/;
