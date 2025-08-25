@@ -44,33 +44,6 @@ interface User {
 export default function Users() {
   const { user: currentUser, userRole } = useAuth();
   const { toast } = useToast();
-
-  // Show loading while auth is being determined
-  if (userRole === null) {
-    return (
-      <div className="min-h-screen bg-white font-roboto flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-gray-600">Verifica autorizzazioni...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show access denied if not admin
-  if (userRole !== "admin") {
-    return (
-      <div className="min-h-screen bg-white font-roboto flex items-center justify-center">
-        <div className="text-center">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-8 max-w-md">
-            <h2 className="text-xl font-semibold text-red-800 mb-2">Accesso Negato</h2>
-            <p className="text-red-600">Questa pagina è riservata agli amministratori.</p>
-            <p className="text-sm text-red-500 mt-2">Ruolo attuale: {userRole || 'Non definito'}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
   const [users, setUsers] = useState<User[]>([]);
   const [masters, setMasters] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
