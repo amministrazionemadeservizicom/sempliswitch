@@ -15,14 +15,14 @@ try {
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
     // Use credentials from environment variable (production/secure setup)
     const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
-    visionClient = new vision.ImageAnnotatorClient({
+    visionClient = new ImageAnnotatorClient({
       credentials,
       projectId: process.env.GOOGLE_CLOUD_PROJECT_ID || credentials.project_id
     });
     console.log('✅ Google Cloud Vision initialized with environment credentials');
   } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
     // Use credentials from file path (fallback for local development)
-    visionClient = new vision.ImageAnnotatorClient();
+    visionClient = new ImageAnnotatorClient();
     console.log('✅ Google Cloud Vision initialized with file credentials');
   } else {
     throw new Error('No Google Cloud credentials found');
