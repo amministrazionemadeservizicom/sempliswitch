@@ -87,7 +87,14 @@ export default function Profile() {
     console.log('🔍 Profile page - userRole:', userRole);
     console.log('🔍 Profile page - localStorage uid:', localStorage.getItem('uid'));
     console.log('🔍 Profile page - localStorage userRole:', localStorage.getItem('userRole'));
-    fetchUserData();
+    console.log('🔍 Profile page - localStorage userName:', localStorage.getItem('userName'));
+
+    // Delay the data fetching slightly to allow useAuth to set up
+    const timer = setTimeout(() => {
+      fetchUserData();
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [currentUser]);
 
   const fetchUserData = async () => {
@@ -95,9 +102,26 @@ export default function Profile() {
     const uid = currentUser?.uid || localStorage.getItem('uid');
 
     if (!uid) {
-      console.log('❌ Profile: No UID found, redirecting to login');
-      navigate('/');
-      return;
+      console.log('❌ Profile: No UID found');
+
+      // Check if we're just waiting for useAuth to initialize
+      const storedUserName = localStorage.getItem('userName');
+      const storedUserRole = localStorage.getItem('userRole');
+
+      if (!storedUserName && !storedUserRole) {
+        console.log('❌ Profile: No localStorage data either, redirecting to login');
+        navigate('/');
+        return;
+      } else {
+        console.log('⚠️ Profile: UID missing but localStorage has data, waiting...');
+        // Don't redirect immediately, wait for useAuth to initialize
+        setTimeout(() => {
+          if (!currentUser?.uid && !localStorage.getItem('uid')) {
+            navigate('/');
+          }
+        }, 2000);
+        return;
+      }
     }
 
     console.log('🔍 Profile: Using UID:', uid);
