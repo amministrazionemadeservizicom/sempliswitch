@@ -9,6 +9,7 @@ import {
   BarChart3,
   Settings,
   Users,
+  User,
   Zap,
   TrendingUp,
   Calculator,
