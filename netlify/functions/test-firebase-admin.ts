@@ -27,7 +27,7 @@ export default async (request: Request, context: Context) => {
     const { adminDb, adminAuth, adminOperations } = await import('../../server/firebase-admin');
     
     // Test 1: Check Firestore access
-    const contractsSnapshot = await adminDb.collection('contratti').limit(1).get();
+    const contractsSnapshot = await adminDb.collection('contracts').limit(1).get();
     const contractsCount = contractsSnapshot.size;
     
     // Test 2: Check Auth access
