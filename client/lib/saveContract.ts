@@ -1,28 +1,4 @@
-import { db } from "../firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-
-// Helper function to recursively remove undefined values from objects
-function cleanUndefinedValues(obj: any): any {
-  if (obj === null || obj === undefined) {
-    return null;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(cleanUndefinedValues).filter(item => item !== undefined);
-  }
-
-  if (typeof obj === 'object') {
-    const cleaned: any = {};
-    for (const [key, value] of Object.entries(obj)) {
-      if (value !== undefined) {
-        cleaned[key] = cleanUndefinedValues(value);
-      }
-    }
-    return cleaned;
-  }
-
-  return obj;
-}
+import { adminApi } from "../utils/admin-api";
 
 interface ContractData {
   cliente: {
@@ -78,81 +54,23 @@ export async function saveContract({
   masterReference
 }: SaveContractInput) {
   try {
-    if (!db) {
-      throw new Error("Firebase non configurato");
-    }
+    console.log("💾 Saving contract via secure Admin API...");
 
-    // Generate unique contract code
-    const timestamp = Date.now();
-    const codiceUnivocoOfferta = `CON-${timestamp}`;
-
-    // Determine contract type and provider from selected offers
-    const tipologiaContratto = contractData.offerte.some(offer => 
-      offer.serviceType === "Luce" || offer.serviceType === "Gas"
-    ) ? "energia" : "telefonia";
-
-    const gestore = contractData.offerte[0]?.brand || "UNKNOWN";
-
-    // Map to Contract interface format
-    const contractForFirebase = {
-      codiceUnivocoOfferta,
-      dataCreazione: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
-      creatoDa: {
-        id: userId,
-        nome: userName,
-        cognome: userSurname
-      },
-      contatto: {
-        nome: contractData.cliente.nome,
-        cognome: contractData.cliente.cognome,
-        codiceFiscale: contractData.cliente.codiceFiscale
-      },
-      isBusiness: false, // Default to residential, could be calculated from data
-      statoOfferta: 'Caricato' as const,
-      noteStatoOfferta: 'Contratto appena creato',
-      gestore,
-      masterReference: masterReference || '',
-      tipologiaContratto,
-      
-      // Additional detailed data
-      dettagliCliente: {
-        cellulare: contractData.cliente.cellulare,
-        email: contractData.cliente.email,
-        iban: contractData.cliente.iban || null
-      },
-      documento: contractData.documento,
-      indirizzi: contractData.indirizzi,
-      datiTecnici: {
-        pod: contractData.pod || null,
-        pdr: contractData.pdr || null,
-        potenzaImpegnataKw: contractData.potenzaImpegnataKw || null,
-        usiGas: contractData.usiGas || [],
-        residenziale: contractData.residenziale || null
-      },
-      offerte: contractData.offerte || [],
-
-      // Timestamps
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    };
-
-    // Clean undefined values from the entire object
-    const cleanedContract = cleanUndefinedValues(contractForFirebase);
-
-    console.log("💾 Saving contract to Firebase:", cleanedContract);
-
-    const docRef = await addDoc(collection(db, "contracts"), cleanedContract);
+    // Use secure Admin API endpoint for contract saving
+    const result = await adminApi.saveContract(
+      contractData,
+      userId,
+      userName,
+      userSurname,
+      masterReference
+    );
     
-    console.log("✅ Contract saved successfully with ID:", docRef.id);
+    console.log("✅ Contract saved successfully via Admin API:", result);
     
-    return {
-      success: true,
-      contractId: docRef.id,
-      codiceUnivocoOfferta
-    };
+    return result;
 
   } catch (error: any) {
-    console.error("❌ Error saving contract:", error);
+    console.error("❌ Error saving contract via Admin API:", error);
     throw new Error(`Errore nel salvataggio del contratto: ${error.message}`);
   }
 }
