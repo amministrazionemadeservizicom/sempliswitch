@@ -26,29 +26,66 @@ export default function AppLayout({
     const fetchUserData = async () => {
       try {
         const uid = localStorage.getItem("uid");
+        const storedUserName = localStorage.getItem("userName");
+        const storedUserRole = localStorage.getItem("userRole");
+        const storedUserEmail = localStorage.getItem("userEmail");
+
+        console.log('🔍 AppLayout: localStorage data:', {
+          uid,
+          userName: storedUserName,
+          userRole: storedUserRole,
+          userEmail: storedUserEmail
+        });
+
+        // First, set data from localStorage immediately
+        if (storedUserName && storedUserName !== 'Utente') {
+          setUserFullName(storedUserName);
+          console.log('✅ AppLayout: Set userFullName from localStorage:', storedUserName);
+        }
+
         if (!uid) {
-          setUserFullName("Utente");
+          setUserFullName(storedUserName || "Utente");
           setUserData(null);
           return;
         }
 
-        const userDoc = await getDoc(doc(db, "utenti", uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          setUserData({ ...data, uid });
+        // Then try to get updated data from Firebase
+        try {
+          const userDoc = await getDoc(doc(db, "utenti", uid));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            setUserData({ ...data, uid });
 
-          // Try fullName first, then concatenate nome + cognome, fallback to "Utente"
-          const fullName = data.fullName ||
-                            (data.nome && data.cognome ? `${data.nome} ${data.cognome}` : null) ||
-                           "Utente";
-          setUserFullName(fullName);
-        } else {
-          setUserFullName("Utente");
-          setUserData(null);
+            // Handle both possible field name formats and update localStorage if needed
+            const nome = data.nome || data.Nome || "";
+            const cognome = data.cognome || data.Cognome || "";
+            const fullName = data.fullName ||
+                              (nome && cognome ? `${nome} ${cognome}`.trim() : null) ||
+                              storedUserName ||
+                              "Utente";
+
+            setUserFullName(fullName);
+
+            // Update localStorage if Firebase has newer data
+            if (fullName !== storedUserName && fullName !== "Utente") {
+              localStorage.setItem("userName", fullName);
+            }
+
+            console.log('✅ AppLayout: Updated userFullName from Firebase:', fullName);
+          } else {
+            // Firebase doc doesn't exist, keep localStorage data
+            setUserFullName(storedUserName || "Utente");
+            console.log('⚠️ AppLayout: No Firebase doc, using localStorage:', storedUserName);
+          }
+        } catch (firebaseError) {
+          // Firebase error, keep localStorage data
+          console.warn('Firebase error in AppLayout, using localStorage:', firebaseError);
+          setUserFullName(storedUserName || "Utente");
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
-        setUserFullName("Utente");
+        const storedUserName = localStorage.getItem("userName");
+        setUserFullName(storedUserName || "Utente");
         setUserData(null);
       }
     };
