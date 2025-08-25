@@ -586,6 +586,11 @@ export default function CompileContract() {
                           {offer.commodity === "electricity" ? "Luce" : "Gas"}
                         </Badge>
                       )}
+                      {!offer.commodity && (
+                        <Badge variant="secondary" className="mt-1">
+                          Commodity non specificata
+                        </Badge>
+                      )}
                     </div>
                     <Badge variant="outline">{offer.price}</Badge>
                   </div>
