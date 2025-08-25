@@ -409,7 +409,7 @@ export default function CompileContract() {
       setBillPreviews(prev => [...prev, ...previews]);
       
       // Parse bill data
-      const { addr, capCitta, pod, pdr } = parseBillData(text);
+      const { addr, capCitta, pod, pdr, potenzaImpegnata } = parseBillData(text);
       
       // Try to extract residence address
       const resAddr = addr("RESIDENZA") || addr("DOMICILIO") || addr("INTESTATARIO");
