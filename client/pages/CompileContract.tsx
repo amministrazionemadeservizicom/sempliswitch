@@ -443,6 +443,11 @@ export default function CompileContract() {
       if (selectedOffer?.commodity === "gas" && pdr) {
         setValue("pdr", pdr);
       }
+
+      // Extract potenza impegnata for electricity
+      if (selectedOffer?.commodity === "electricity" && potenzaImpegnata) {
+        setValue("potenzaImpegnataKw", potenzaImpegnata);
+      }
       
       setBillUploaded(true);
       toast.success("Fattura elaborata con successo");
