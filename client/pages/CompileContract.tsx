@@ -376,12 +376,8 @@ export default function CompileContract() {
       const { text, parsed, previews } = await processDocumentOCR(Array.from(files));
       setDocPreviews(prev => [...prev, ...previews]);
 
-      // Detect document type locally
-      const detectedType = detectDocType(text);
-
       // Debug: log extracted text
       console.log("📄 Testo estratto OCR:", text);
-      console.log("🔍 Tipo documento rilevato:", detectedType);
       console.log("📋 Dati parsificati:", parsed);
 
       // Auto-fill form fields with debug
@@ -415,23 +411,10 @@ export default function CompileContract() {
       console.log(`📊 Totale campi compilati: ${filledFields}/5`);
 
       // Show success message
-      toast.success(`Documento elaborato con Netlify OCR. ${filledFields} campi compilati automaticamente.`);
+      toast.success(`Documento elaborato con OCR. ${filledFields} campi compilati automaticamente.`);
 
       setDocumentUploaded(true);
       setOcrSource(prev => ({ ...prev, doc: 'netlify' }));
-
-      // Show info toast if detected type differs from selected
-      const selectedDocType = watch("docTipo");
-      const typeMapping = {
-        "CIE": "CARTA_IDENTITA",
-        "CARTA_VECCHIA": "CARTA_IDENTITA",
-        "PATENTE": "PATENTE",
-        "PASSAPORTO": "PASSAPORTO"
-      };
-
-      if (typeMapping[detectedType as keyof typeof typeMapping] !== selectedDocType) {
-        toast.info(`Documento rilevato: ${detectedType}. Puoi modificare il tipo se necessario.`);
-      }
 
     } catch (err: any) {
       console.error("OCR error:", err);
