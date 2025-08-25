@@ -36,26 +36,90 @@ export async function processDocumentOCR(files: File[]): Promise<{
     })
   );
 
-  // Temporarily using local OCR directly - Netlify endpoint not available
-  // TODO: Re-enable Netlify OCR when endpoint is properly configured
-
+  // Try Netlify OCR first (now properly configured)
   try {
-    console.log('📤 Usando OCR locale (Tesseract.js)...');
+    console.log('📤 Tentativo OCR Netlify...');
 
-    const { text } = await extractTextFromFiles(files);
-    const detectedType = detectDocType(text);
-    const parsed = parseFieldsByType(detectedType, text);
+    // Prepare multipart form data
+    const formData = new FormData();
+    files.forEach((file, index) => {
+      formData.append(`file${index}`, file);
+    });
 
-    console.log('✅ OCR locale completato con successo');
+    // Call Netlify function with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+    const response = await fetch(OCR_ENDPOINT, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`OCR request failed: ${response.status} ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('📥 Risposta Netlify OCR:', result);
+
+    if (!result.ok) {
+      throw new Error(result.error || 'OCR failed');
+    }
+
+    const { text, fields } = result;
+
+    // Convert Netlify fields to our expected format
+    const parsed: ParsedFields = {
+      nome: fields.nome,
+      cognome: fields.cognome,
+      codiceFiscale: fields.codice_fiscale,
+      numeroDocumento: fields.numero_documento,
+      scadenza: fields.data_scadenza,
+      dataNascita: fields.data_nascita,
+      luogoNascita: fields.luogo_nascita,
+      conf: 0.8 // High confidence for Google Vision
+    };
+
+    console.log('✅ OCR Netlify completato con successo');
     return {
       text: text || '',
-      parsed: { ...parsed, conf: 0.6 }, // Tesseract confidence
+      parsed,
       previews
     };
 
-  } catch (ocrError) {
-    console.error('❌ Errore OCR locale:', ocrError);
-    throw new Error(`OCR failed: ${ocrError.message}`);
+  } catch (netlifyError) {
+    // Log specific error types for debugging
+    const errorMsg = netlifyError.message || 'Unknown error';
+    if (errorMsg.includes('Failed to fetch')) {
+      console.warn('⚠️ OCR Netlify: errore di rete (Failed to fetch), usando fallback locale');
+    } else if (errorMsg.includes('AbortError')) {
+      console.warn('⚠️ OCR Netlify: timeout, usando fallback locale');
+    } else {
+      console.warn('⚠️ OCR Netlify fallito:', errorMsg, ', usando fallback locale');
+    }
+
+    // Fallback to local Tesseract.js OCR
+    try {
+      console.log('📤 Usando OCR locale (Tesseract.js) come fallback...');
+
+      const { text } = await extractTextFromFiles(files);
+      const detectedType = detectDocType(text);
+      const parsed = parseFieldsByType(detectedType, text);
+
+      console.log('✅ OCR locale completato con successo');
+      return {
+        text: text || '',
+        parsed: { ...parsed, conf: 0.6 }, // Lower confidence for Tesseract
+        previews
+      };
+
+    } catch (fallbackError) {
+      console.error('❌ Errore anche nel fallback OCR locale:', fallbackError);
+      throw new Error(`OCR failed: Netlify (${errorMsg}) and local (${fallbackError.message})`);
+    }
   }
 }
 
