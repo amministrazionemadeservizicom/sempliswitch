@@ -1053,7 +1053,7 @@ export default function CompileContract() {
                             placeholder="3.0"
                           />
                           {errors.potenzaImpegnataKw && (
-                            <p className="text-sm text-red-600 mt-1">{errors.potenzaImpegnataKw.message}</p>
+                            <p className="text-sm text-red-600 mt-1">{errors.potenzaImpegnataKw.message?.toString()}</p>
                           )}
                         </div>
                       </div>
