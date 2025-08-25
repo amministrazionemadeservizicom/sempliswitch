@@ -62,10 +62,11 @@ export default function Sidebar({ userRole, isCollapsed = false, onToggle, userF
   const [overflowItems, setOverflowItems] = useState<MenuItem[]>([]);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
-  const filteredMenuItems = useMemo(() =>
-    menuItems.filter(item => item.roles.includes(userRole)),
-    [userRole]
-  );
+  const filteredMenuItems = useMemo(() => {
+    const filtered = menuItems.filter(item => item.roles.includes(userRole));
+    console.log('🔍 Sidebar - userRole:', userRole, 'filtered items:', filtered.length);
+    return filtered;
+  }, [userRole]);
 
   // Calculate initials from userFullName
   const initials = userFullName
