@@ -104,6 +104,7 @@ export default function Profile() {
       
       if (userDoc.exists()) {
         const data = userDoc.data();
+        console.log('✅ Profile: User document found:', data);
         const profileData: UserData = {
           uid: currentUser.uid,
           nome: data.nome || '',
@@ -131,7 +132,9 @@ export default function Profile() {
         
         setUserData(profileData);
         setFormData(profileData);
+        console.log('✅ Profile: User profile data set:', profileData);
       } else {
+        console.log('❌ Profile: User document not found for uid:', currentUser.uid);
         toast({
           variant: "destructive",
           title: "Errore",
