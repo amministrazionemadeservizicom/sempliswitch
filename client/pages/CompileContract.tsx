@@ -38,7 +38,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 // Regex patterns
 const CF_REGEX = /^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/;
-const IBAN_IT_REGEX = /^IT\d{2}[A-Z]\d{3}\d{4}\d{12}$/;
+const IBAN_IT_REGEX = /^IT\d{2}[A-Z0-9]{23}$/;
 
 // Types
 interface Offer {
@@ -405,7 +405,7 @@ export default function CompileContract() {
       }
       if (parsed.numeroDocumento) {
         setValue("docNumero", parsed.numeroDocumento);
-        console.log("✅ Numero documento compilato:", parsed.numeroDocumento);
+        console.log("�� Numero documento compilato:", parsed.numeroDocumento);
         filledFields++;
       }
       if (parsed.scadenza) {
