@@ -174,6 +174,8 @@ async function extractFromImage(file: File) {
 
 // 🔥 Funzione principale ottimizzata
 export async function extractTextFromFiles(files: File[]) {
+  console.log('🔥 Avvio extractTextFromFiles con', files.length, 'file(s)');
+
   const pages: { filename: string; page: number; text: string; previewUrl: string }[] = [];
   const previewsAll: string[] = [];
   let allText = "";
@@ -185,6 +187,7 @@ export async function extractTextFromFiles(files: File[]) {
 
   const maxFileSize = 5 * 1024 * 1024; // 5MB
   for (const file of files) {
+    console.log('📁 Controllo file:', file.name, 'Size:', Math.round(file.size/1024/1024), 'MB');
     if (file.size > maxFileSize) {
       throw new Error(`File "${file.name}" troppo grande (${Math.round(file.size/1024/1024)}MB). Massimo 5MB per file.`);
     }
@@ -193,16 +196,23 @@ export async function extractTextFromFiles(files: File[]) {
   try {
     await runWithTimeout((async () => {
       for (const file of files) {
+        console.log('📄 Elaborazione file:', file.name);
         const ext = (file.name.split(".").pop() || "").toLowerCase();
+
         if (ext === "pdf") {
+          console.log('📋 Processing PDF...');
           const { text, previewUrls } = await extractFromPDF(file);
+          console.log('📋 PDF text length:', text.length);
           allText += `\n\n=== ${file.name} ===\n${text}`;
           previewUrls.forEach((url, idx) => {
             pages.push({ filename: file.name, page: idx + 1, text: "", previewUrl: url });
           });
           previewsAll.push(...previewUrls);
         } else {
+          console.log('🖼️ Processing image...');
           const { text, previewUrls } = await extractFromImage(file);
+          console.log('🖼️ Image text length:', text.length);
+          console.log('🖼️ First 200 chars:', text.substring(0, 200));
           allText += `\n\n=== ${file.name} ===\n${text}`;
           pages.push({ filename: file.name, page: 1, text, previewUrl: previewUrls[0] });
           previewsAll.push(...previewUrls);
@@ -210,8 +220,10 @@ export async function extractTextFromFiles(files: File[]) {
       }
     })(), 25000); // Ridotto da 45s a 25s
 
+    console.log('✅ extractTextFromFiles completato. Total text length:', allText.length);
     return { text: allText.trim(), pages, previews: previewsAll };
   } catch (error: any) {
+    console.error('❌ Errore in extractTextFromFiles:', error);
     await safeTerminate();
     if (error.message?.includes("timeout")) {
       throw new Error("OCR timeout: prova con immagini più piccole o meno file.");
