@@ -2,8 +2,15 @@ import { createWorker, PSM, OEM, Worker } from "tesseract.js";
 import * as pdfjsLib from "pdfjs-dist";
 
 // @ts-ignore - serve per far caricare il worker di pdf.js in ambiente Vite/CRA
-(pdfjsLib as any).GlobalWorkerOptions.workerSrc =
-  "https://unpkg.com/pdfjs-dist@5.4.54/build/pdf.worker.min.js";
+// Try multiple CDNs for better reliability
+try {
+  (pdfjsLib as any).GlobalWorkerOptions.workerSrc =
+    "https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.54/build/pdf.worker.min.js";
+} catch {
+  // Fallback CDN
+  (pdfjsLib as any).GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.54/pdf.worker.min.js";
+}
 
 let ocrWorker: Worker | null = null;
 
