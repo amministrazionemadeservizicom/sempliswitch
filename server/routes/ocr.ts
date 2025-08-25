@@ -2,8 +2,29 @@ import { RequestHandler } from "express";
 import vision from "@google-cloud/vision";
 import { detectDocType, parseFieldsByType } from "../../client/utils/id-parsers";
 
-// Initialize Google Cloud Vision client
-const visionClient = new vision.ImageAnnotatorClient();
+// Initialize Google Cloud Vision client with credentials from environment
+let visionClient: vision.ImageAnnotatorClient;
+
+try {
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+    // Use credentials from environment variable (production/secure setup)
+    const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+    visionClient = new vision.ImageAnnotatorClient({
+      credentials,
+      projectId: process.env.GOOGLE_CLOUD_PROJECT_ID || credentials.project_id
+    });
+    console.log('✅ Google Cloud Vision initialized with environment credentials');
+  } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    // Use credentials from file path (fallback for local development)
+    visionClient = new vision.ImageAnnotatorClient();
+    console.log('✅ Google Cloud Vision initialized with file credentials');
+  } else {
+    throw new Error('No Google Cloud credentials found');
+  }
+} catch (error) {
+  console.error('❌ Failed to initialize Google Cloud Vision:', error);
+  // We'll handle this error in the endpoints
+}
 
 // Helper function to extract text from image buffer
 async function extractTextFromBuffer(buffer: Buffer): Promise<string> {
