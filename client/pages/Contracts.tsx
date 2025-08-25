@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { testFirebaseConnection } from "../utils/firebase-test";
+import { adminApi } from "../utils/admin-api";
 
 interface Contract {
   id: string;
