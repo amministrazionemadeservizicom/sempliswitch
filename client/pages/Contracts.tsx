@@ -133,36 +133,59 @@ export default function Contracts() {
 
         setContracts(formattedContracts);
         console.log("✅ CONTRATTI CARICATI CON SUCCESSO VIA ADMIN API:", formattedContracts);
-      } catch (adminError) {
+      } catch (adminError: any) {
         console.warn("⚠️ Admin API failed, falling back to direct Firebase access:", adminError);
 
-        // Fallback to direct Firebase access
-        console.log("📡 Attempting to fetch from 'contracts' collection...");
-        const querySnapshot = await getDocs(collection(db, "contracts"));
-        console.log("📊 Contratti trovati:", querySnapshot.size);
-        console.log("📋 Query snapshot:", querySnapshot);
-
-        const contractsFromFirebase: Contract[] = querySnapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            codiceUnivocoOfferta: data.codiceUnivocoOfferta || '',
-            dataCreazione: data.dataCreazione || '',
-            creatoDa: data.creatoDa || { id: '', nome: '', cognome: '' },
-            contatto: data.contatto || { nome: '', cognome: '', codiceFiscale: '' },
-            ragioneSociale: data.ragioneSociale || '',
-            isBusiness: data.isBusiness || false,
-            statoOfferta: data.statoOfferta || 'Caricato',
-            noteStatoOfferta: data.noteStatoOfferta || '',
-            gestore: data.gestore || '',
-            filePath: data.filePath || '',
-            masterReference: data.masterReference || '',
-            tipologiaContratto: data.tipologiaContratto || 'energia'
-          };
+        // Show user-friendly warning about reduced functionality
+        toast({
+          variant: "destructive",
+          title: "⚠️ Modalità ridotta",
+          description: "Le funzioni di amministrazione non sono disponibili. Alcune funzionalità potrebbero essere limitate."
         });
 
-        setContracts(contractsFromFirebase);
-        console.log("✅ CONTRATTI CARICATI CON SUCCESSO:", contractsFromFirebase);
+        try {
+          // Fallback to direct Firebase access
+          console.log("📡 Attempting to fetch from 'contracts' collection...");
+          const querySnapshot = await getDocs(collection(db, "contracts"));
+          console.log("📊 Contratti trovati:", querySnapshot.size);
+          console.log("📋 Query snapshot:", querySnapshot);
+
+          const contractsFromFirebase: Contract[] = querySnapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              codiceUnivocoOfferta: data.codiceUnivocoOfferta || '',
+              dataCreazione: data.dataCreazione || '',
+              creatoDa: data.creatoDa || { id: '', nome: '', cognome: '' },
+              contatto: data.contatto || { nome: '', cognome: '', codiceFiscale: '' },
+              ragioneSociale: data.ragioneSociale || '',
+              isBusiness: data.isBusiness || false,
+              statoOfferta: data.statoOfferta || 'Caricato',
+              noteStatoOfferta: data.noteStatoOfferta || '',
+              gestore: data.gestore || '',
+              filePath: data.filePath || '',
+              masterReference: data.masterReference || '',
+              tipologiaContratto: data.tipologiaContratto || 'energia'
+            };
+          });
+
+          setContracts(contractsFromFirebase);
+          console.log("✅ CONTRATTI CARICATI CON SUCCESSO:", contractsFromFirebase);
+
+          toast({
+            title: "✅ Dati caricati",
+            description: `${contractsFromFirebase.length} contratti caricati tramite accesso diretto`
+          });
+
+        } catch (fallbackError) {
+          console.error("❌ Fallback Firebase access also failed:", fallbackError);
+          toast({
+            variant: "destructive",
+            title: "Errore critico",
+            description: "Impossibile caricare i contratti. Verifica la connessione."
+          });
+          setContracts([]);
+        }
       }
       } catch (error) {
         console.error("❌ Errore nel recupero contratti da Firebase:", error);
