@@ -2,7 +2,14 @@ import { useEffect, useState } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
-export function useAuth() {
+
+interface AuthReturn {
+  user: any;
+  userRole: string | null;
+  userData: any;
+}
+
+export function useAuth(): AuthReturn {
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userData, setUserData] = useState<any>(null);
