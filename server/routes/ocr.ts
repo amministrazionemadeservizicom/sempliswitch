@@ -129,7 +129,7 @@ export const handleDocumentOCR = async (req: RequestWithFiles, res: Response) =>
 };
 
 // OCR endpoint for bills/invoices
-export const handleBillOCR: RequestHandler = async (req, res) => {
+export const handleBillOCR = async (req: RequestWithFiles, res: Response) => {
   try {
     if (!req.files || !('file' in req.files)) {
       return res.status(400).json({ error: "No file uploaded" });
