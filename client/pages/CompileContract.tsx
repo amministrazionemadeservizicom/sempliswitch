@@ -207,8 +207,12 @@ function parseBillData(text: string) {
   
   const pod = t.match(/\bPOD\s*([A-Z0-9]{14,})\b/i)?.[1];
   const pdr = t.match(/\bPDR\s*([0-9]{14})\b/i)?.[1];
-  
-  return { addr, capCitta, pod, pdr };
+
+  // Estrazione potenza impegnata per luce
+  const potenzaMatch = t.match(/POTENZA\s+(IMPEGNATA|CONTRATTUALE)[^0-9]{0,10}(\d+[.,]?\d*)\s*KW/i);
+  const potenzaImpegnata = potenzaMatch ? parseFloat(potenzaMatch[2].replace(',', '.')) : undefined;
+
+  return { addr, capCitta, pod, pdr, potenzaImpegnata };
 }
 
 export default function CompileContract() {
