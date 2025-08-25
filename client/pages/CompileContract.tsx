@@ -414,93 +414,61 @@ export default function CompileContract() {
     }
   };
   
-  // Handle bill upload with OCR (Google Cloud Vision + fallback)
+  // Handle bill upload with OCR (Tesseract.js)
   const handleBillUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
     setOcrLoading(true);
     try {
-      const { text, data, previews, source } = await extractBillData(Array.from(files));
+      const { text, previews } = await extractTextFromFiles(Array.from(files));
       setBillPreviews(prev => [...prev, ...previews]);
 
-      // Show success message with OCR source
-      toast.success(`Fattura elaborata con ${source === 'google' ? 'Google Cloud Vision' : 'Tesseract.js'}`);
+      // Show success message
+      toast.success("Fattura elaborata con Tesseract.js");
 
-      // Use Google OCR extracted data if available
-      if (source === 'google' && data) {
-        // Residence address from Google OCR
-        if (data.residenza) {
-          if (data.residenza.via) setValue("resVia", data.residenza.via);
-          if (data.residenza.civico) setValue("resCivico", data.residenza.civico);
-          if (data.residenza.citta) setValue("resCitta", data.residenza.citta);
-          if (data.residenza.cap) setValue("resCap", data.residenza.cap);
-        }
+      // Parse bill data
+      const { addr, capCitta, pod, pdr, potenzaImpegnata } = parseBillData(text);
 
-        // Supply address from Google OCR
-        if (data.fornitura) {
-          if (data.fornitura.via) setValue("fornVia", data.fornitura.via);
-          if (data.fornitura.civico) setValue("fornCivico", data.fornitura.civico);
-          if (data.fornitura.citta) setValue("fornCitta", data.fornitura.citta);
-          if (data.fornitura.cap) setValue("fornCap", data.fornitura.cap);
-        }
+      // Try to extract residence address
+      const resAddr = addr("RESIDENZA") || addr("DOMICILIO") || addr("INTESTATARIO");
+      if (resAddr) {
+        setValue("resVia", resAddr.via);
+        setValue("resCivico", resAddr.civico);
+      }
 
-        // POD/PDR from Google OCR
-        if (selectedOffer?.commodity === "electricity" && data.pod) {
-          setValue("pod", data.pod);
-        }
-        if (selectedOffer?.commodity === "gas" && data.pdr) {
-          setValue("pdr", data.pdr);
-        }
+      // Try to extract supply address
+      const supplyAddr = addr("FORNITURA") || addr("UTENZA") || addr("CONTATORE");
+      if (supplyAddr) {
+        setValue("fornVia", supplyAddr.via);
+        setValue("fornCivico", supplyAddr.civico);
+      }
 
-        // Potenza impegnata from Google OCR
-        if (selectedOffer?.commodity === "electricity" && data.potenzaImpegnata) {
-          setValue("potenzaImpegnataKw", data.potenzaImpegnata);
-        }
-      } else {
-        // Fallback to client-side parsing for Tesseract or if Google OCR data is incomplete
-        const { addr, capCitta, pod, pdr, potenzaImpegnata } = parseBillData(text);
-
-        // Try to extract residence address
-        const resAddr = addr("RESIDENZA") || addr("DOMICILIO") || addr("INTESTATARIO");
-        if (resAddr) {
-          setValue("resVia", resAddr.via);
-          setValue("resCivico", resAddr.civico);
-        }
-
-        // Try to extract supply address
-        const supplyAddr = addr("FORNITURA") || addr("UTENZA") || addr("CONTATORE");
-        if (supplyAddr) {
-          setValue("fornVia", supplyAddr.via);
-          setValue("fornCivico", supplyAddr.civico);
-        }
-
-        // Extract CAP and city
-        const location = capCitta();
-        if (location) {
-          setValue("resCap", location.cap);
-          setValue("resCitta", location.citta);
-          if (!supplyAddr && resAddr) {
-            setValue("fornCap", location.cap);
-            setValue("fornCitta", location.citta);
-          }
-        }
-
-        // Extract POD/PDR based on commodity
-        if (selectedOffer?.commodity === "electricity" && pod) {
-          setValue("pod", pod);
-        }
-        if (selectedOffer?.commodity === "gas" && pdr) {
-          setValue("pdr", pdr);
-        }
-
-        // Extract potenza impegnata for electricity
-        if (selectedOffer?.commodity === "electricity" && potenzaImpegnata) {
-          setValue("potenzaImpegnataKw", potenzaImpegnata);
+      // Extract CAP and city
+      const location = capCitta();
+      if (location) {
+        setValue("resCap", location.cap);
+        setValue("resCitta", location.citta);
+        if (!supplyAddr && resAddr) {
+          setValue("fornCap", location.cap);
+          setValue("fornCitta", location.citta);
         }
       }
 
+      // Extract POD/PDR based on commodity
+      if (selectedOffer?.commodity === "electricity" && pod) {
+        setValue("pod", pod);
+      }
+      if (selectedOffer?.commodity === "gas" && pdr) {
+        setValue("pdr", pdr);
+      }
+
+      // Extract potenza impegnata for electricity
+      if (selectedOffer?.commodity === "electricity" && potenzaImpegnata) {
+        setValue("potenzaImpegnataKw", potenzaImpegnata);
+      }
+
       setBillUploaded(true);
-      setOcrSource(prev => ({ ...prev, bill: source }));
+      setOcrSource(prev => ({ ...prev, bill: 'tesseract' }));
 
     } catch (err: any) {
       console.error("Bill OCR error:", err);
