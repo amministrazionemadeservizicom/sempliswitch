@@ -228,7 +228,7 @@ export default function CompileContract() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [docPreviews, setDocPreviews] = useState<string[]>([]);
   const [billPreviews, setBillPreviews] = useState<string[]>([]);
-  const [ocrSource, setOcrSource] = useState<{ doc?: 'google' | 'tesseract'; bill?: 'google' | 'tesseract' }>({});
+  const [ocrSource, setOcrSource] = useState<{ doc?: 'google' | 'tesseract' | 'netlify'; bill?: 'google' | 'tesseract' | 'netlify' }>({});
 
   // Camera hook for mobile photo capture
   const { isMobile, isCapturing, capturePhoto, error: cameraError, clearError } = useCamera();
