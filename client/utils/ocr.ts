@@ -163,7 +163,11 @@ export async function extractTextFromFiles(files: File[]) {
   const previewsAll: string[] = [];
   let allText = "";
 
-  // Controllo dimensione file (max 5MB per file)
+  // Limitazioni per performance
+  if (files.length > 3) {
+    throw new Error("Massimo 3 file alla volta per evitare timeout.");
+  }
+
   const maxFileSize = 5 * 1024 * 1024; // 5MB
   for (const file of files) {
     if (file.size > maxFileSize) {
