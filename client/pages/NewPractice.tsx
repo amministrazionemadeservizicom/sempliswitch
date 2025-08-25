@@ -273,7 +273,7 @@ const ACTIVATION_TYPES = {
 
 export default function NewPractice() {
   const navigate = useNavigate();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, userRole } = useAuth();
   const { toast } = useToast();
   
   // File upload refs
@@ -705,7 +705,7 @@ export default function NewPractice() {
   };
 
   return (
-    <AppLayout userRole={currentUser?.ruolo || "consulente"}>
+    <AppLayout userRole={userRole || "consulente"}>
       <div className="min-h-screen bg-white font-roboto">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           
