@@ -229,8 +229,14 @@ export default function Contracts() {
   };
 
   const handleEditContract = (contract: Contract) => {
-    // Navigazione alla pagina di modifica contratto
-    navigate(`/contracts/${contract.id}/edit`);
+    setEditingContract(contract);
+    setEditContractData({
+      statoOfferta: contract.statoOfferta,
+      noteStatoOfferta: contract.noteStatoOfferta,
+      contatto: contract.contatto,
+      ragioneSociale: contract.ragioneSociale || ''
+    });
+    setIsEditModalOpen(true);
   };
 
   const handleDeleteContract = (contractId: string) => {
