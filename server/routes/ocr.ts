@@ -65,19 +65,31 @@ function extractCleanField(text: string, pattern: RegExp): string | undefined {
     /^CITTADINANZA/i,
     /^STATURA/i,
     /^DOCUMENTO/i,
-    /^RILASCIATO/i
+    /^RILASCIATO/i,
+    /^PLACE AND DATE/i,
+    /^OF BIRTH/i,
+    /^FATHER AND/i,
+    /^MOTHER'S/i,
+    /^TUTOR'S/i,
+    /^SURNAME/i,
+    /^IDENTITY CARD/i,
+    /^FISCAL CODE/i,
+    /^MUNICIPALITY/i
   ];
 
   if (skipPatterns.some(pattern => pattern.test(value))) {
     return undefined;
   }
 
-  // Stop at common separators or new field indicators
-  value = value.split(/\b(?:COGNOME|NOME|NATO|RILASCIATO|SCADENZA|CITTADINANZA|STATURA)\b/i)[0].trim();
+  // Stop at common separators or new field indicators, but preserve compound names
+  value = value.split(/\b(?:LUOGO E DATA|EMISSIONE|SCADENZA|CITTADINANZA|STATURA|SESSO)\b/i)[0].trim();
+
+  // Remove English labels that might be concatenated
+  value = value.replace(/\s*\/\s*(SURNAME|NAME|PLACE AND DATE OF BIRTH|SEX|HEIGHT|NATIONALITY|ISSUING|EXPIRY).*$/i, '').trim();
 
   // Must be reasonable length and not all caps descriptive text
   if (value.length < 2 || value.length > 50) return undefined;
-  if (value.length > 20 && value === value.toUpperCase()) return undefined;
+  if (value.length > 30 && value === value.toUpperCase() && !value.includes(' ')) return undefined;
 
   return value;
 }
@@ -86,30 +98,79 @@ function parseFieldsByType(type: DocType, text: string): ParsedFields {
   const t = text.replace(/\s+/g," ").trim();
   const CF_RE = /\b([A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z])\b/;
 
-  // Improved parsing for all document types
-  const nome = extractCleanField(t, /\bNOME[:\s]+([A-ZÀ-Ù' -]+)/i);
-  const cognome = extractCleanField(t, /\bCOGNOME[:\s]+([A-ZÀ-Ù' -]+)/i);
-  const dataNascita = toIsoDateLike(t.match(/NATO.*?(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i)?.[1]);
-  const scadenza = toIsoDateLike(t.match(/SCADENZA[:\s]+(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i)?.[1]);
-  const codiceFiscale = t.match(CF_RE)?.[1]?.toUpperCase();
+  let nome, cognome, dataNascita, luogoNascita, scadenza, numeroDocumento;
 
-  let numeroDocumento;
-  if (type === "PATENTE") {
-    numeroDocumento = t.match(/N\.\s*PATENTE[:\s]*([A-Z0-9/-]+)/i)?.[1] || t.match(/\b([A-Z0-9]{8,})\b/)?.[1];
-  } else if (type === "PASSAPORTO") {
-    numeroDocumento = t.match(/N\.\s*PASSAPORTO[:\s]*([A-Z0-9/-]+)/i)?.[1];
+  if (type === "CIE") {
+    // Enhanced CIE parsing
+    const cognomeMatch = t.match(/COGNOME\s*\/\s*SURNAME[:\s]*([A-ZÀ-Ù' -]+)(?=\s*NOME|\/|$)/i);
+    const nomeMatch = t.match(/NOME\s*\/\s*NAME[:\s]*([A-ZÀ-Ù' -]+)(?=\s*LUOGO|SESSO|\/|$)/i);
+
+    if (cognomeMatch) cognome = cognomeMatch[1].trim();
+    if (nomeMatch) nome = nomeMatch[1].trim();
+
+    // Fallback to simple patterns
+    if (!cognome) cognome = extractCleanField(t, /\bCOGNOME[:\s]*([A-ZÀ-Ù' -]+)/i);
+    if (!nome) nome = extractCleanField(t, /\bNOME[:\s]*([A-ZÀ-Ù' -]+)/i);
+
+    // Extract document number (format like CA89525IB)
+    const docNumMatch = t.match(/\b([A-Z]{2}\d{5}[A-Z]{1,2})\b/) || t.match(/N\.[\s]*([A-Z0-9]{6,12})/i);
+    if (docNumMatch) numeroDocumento = docNumMatch[1];
+
+    // Extract birth date and place
+    const birthMatch = t.match(/(?:LUOGO E DATA DI NASCITA|PLACE AND DATE OF BIRTH)[\s\/]*:?[\s]*([A-ZÀ-Ù' \(\)]+)[\s]+(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/i);
+    if (birthMatch) {
+      luogoNascita = birthMatch[1].trim();
+      dataNascita = toIsoDateLike(birthMatch[2]);
+    }
+
+    // Extract expiry date
+    const expiryMatch = t.match(/(?:SCADENZA|EXPIRY)[\s\/]*:?[\s]*(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/i);
+    if (expiryMatch) scadenza = toIsoDateLike(expiryMatch[1]);
+
+    // MRZ parsing as fallback
+    const mrzMatch = t.match(/C<ITA([A-Z0-9<]+)[\r\n]+([A-Z0-9<]+)[\r\n]+([A-Z<]+)/i);
+    if (mrzMatch && (!nome || !cognome)) {
+      const mrzLine3 = mrzMatch[3];
+      const nameParts = mrzLine3.split('<<');
+      if (nameParts.length >= 2 && !cognome) {
+        cognome = nameParts[0].replace(/</g, ' ').trim();
+      }
+      if (nameParts.length >= 2 && !nome) {
+        nome = nameParts[1].replace(/</g, ' ').trim();
+      }
+    }
   } else {
-    numeroDocumento = t.match(/N\.\s*([A-Z0-9/-]+)/i)?.[1];
+    // Standard parsing for other document types
+    nome = extractCleanField(t, /\bNOME[:\s]+([A-ZÀ-Ù' -]+)/i);
+    cognome = extractCleanField(t, /\bCOGNOME[:\s]+([A-ZÀ-Ù' -]+)/i);
+    dataNascita = toIsoDateLike(t.match(/NATO.*?(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i)?.[1]);
+    scadenza = toIsoDateLike(t.match(/SCADENZA[:\s]+(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i)?.[1]);
+
+    if (type === "PATENTE") {
+      numeroDocumento = t.match(/N\.\s*PATENTE[:\s]*([A-Z0-9/-]+)/i)?.[1] || t.match(/\b([A-Z0-9]{8,})\b/)?.[1];
+    } else if (type === "PASSAPORTO") {
+      numeroDocumento = t.match(/N\.\s*PASSAPORTO[:\s]*([A-Z0-9/-]+)/i)?.[1];
+    } else {
+      numeroDocumento = t.match(/N\.\s*([A-Z0-9/-]+)/i)?.[1];
+    }
   }
+
+  // Fallback for birth date if not found
+  if (!dataNascita) {
+    dataNascita = toIsoDateLike(t.match(/(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/)?.[1]);
+  }
+
+  const codiceFiscale = t.match(CF_RE)?.[1]?.toUpperCase();
 
   return {
     nome,
     cognome,
     dataNascita,
+    luogoNascita,
     scadenza,
     numeroDocumento: numeroDocumento || undefined,
     codiceFiscale,
-    conf: 0.6
+    conf: type === "CIE" ? 0.7 : 0.6
   };
 }
 
