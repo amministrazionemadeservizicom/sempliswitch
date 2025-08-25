@@ -72,98 +72,13 @@ export default function Contracts() {
         console.log("🔄 Caricamento contratti da Firebase...");
         
         if (!db) {
-          console.warn("⚠️ Database Firebase non configurato, utilizzo dati mock");
-          const mockContracts: Contract[] = [
-            {
-              id: '1',
-              codiceUnivocoOfferta: 'OFF-2024-001',
-              dataCreazione: '2024-03-15',
-              creatoDa: {
-                id: 'cons-1',
-                nome: 'Mario',
-                cognome: 'Rossi'
-              },
-              contatto: {
-                nome: 'Giuseppe',
-                cognome: 'Verdi',
-                codiceFiscale: 'VRDGPP80A01H501Z'
-              },
-              ragioneSociale: 'Verdi SRL',
-              isBusiness: true,
-              statoOfferta: 'Inserimento OK',
-              noteStatoOfferta: 'Contratto verificato e approvato',
-              gestore: 'ENEL',
-              filePath: '/contratti/ENEL/OFF-2024-001.pdf',
-              masterReference: 'master-1',
-              tipologiaContratto: 'energia'
-            },
-            {
-              id: '2',
-              codiceUnivocoOfferta: 'OFF-2024-002',
-              dataCreazione: '2024-03-14',
-              creatoDa: {
-                id: 'cons-2',
-                nome: 'Giulia',
-                cognome: 'Bianchi'
-              },
-              contatto: {
-                nome: 'Francesco',
-                cognome: 'Neri',
-                codiceFiscale: 'NREFNC75B15F205X'
-              },
-              isBusiness: false,
-              statoOfferta: 'Caricato',
-              noteStatoOfferta: '',
-              gestore: 'SORGENIA',
-              filePath: '/contratti/SORGENIA/OFF-2024-002.pdf',
-              tipologiaContratto: 'energia'
-            },
-            {
-              id: '3',
-              codiceUnivocoOfferta: 'TEL-2024-001',
-              dataCreazione: '2024-03-13',
-              creatoDa: {
-                id: 'cons-1',
-                nome: 'Mario',
-                cognome: 'Rossi'
-              },
-              contatto: {
-                nome: 'Anna',
-                cognome: 'Blu',
-                codiceFiscale: 'BLUANA85C45H501W'
-              },
-              ragioneSociale: 'Blu Communications SPA',
-              isBusiness: true,
-              statoOfferta: 'Pagato',
-              noteStatoOfferta: 'Pagamento ricevuto - attivazione in corso',
-              gestore: 'TIM',
-              filePath: '/contratti/TIM/TEL-2024-001.pdf',
-              tipologiaContratto: 'telefonia'
-            },
-            {
-              id: '4',
-              codiceUnivocoOfferta: 'OFF-2024-003',
-              dataCreazione: '2024-03-12',
-              creatoDa: {
-                id: 'cons-3',
-                nome: 'Paolo',
-                cognome: 'Verde'
-              },
-              contatto: {
-                nome: 'Lucia',
-                cognome: 'Rosa',
-                codiceFiscale: 'RSOLCU90D25F839Y'
-              },
-              isBusiness: false,
-              statoOfferta: 'Annullato',
-              noteStatoOfferta: 'Cliente ha revocato la richiesta',
-              gestore: 'ENI',
-              filePath: '/contratti/ENI/OFF-2024-003.pdf',
-              masterReference: 'master-2',
-              tipologiaContratto: 'energia'
-            }
-          ];
-          setContracts(mockContracts);
+          console.warn("⚠️ Database Firebase non configurato");
+          toast({
+            variant: "destructive",
+            title: "Errore di configurazione",
+            description: "Database Firebase non configurato correttamente"
+          });
+          setContracts([]);
           setLoading(false);
           return;
         }
