@@ -367,39 +367,31 @@ export default function CompileContract() {
     }
   }, [selectedOffers, navigate, isLoaded]);
   
-  // Handle document upload with OCR (Google Cloud Vision + fallback)
+  // Handle document upload with OCR (Tesseract.js)
   const handleDocumentUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
     setOcrLoading(true);
     try {
-      const { text, parsedFields, detectedType, previews, source } = await extractDocumentData(Array.from(files));
+      const { text, previews } = await extractTextFromFiles(Array.from(files));
       setDocPreviews(prev => [...prev, ...previews]);
 
-      // Show success message with OCR source
-      toast.success(`Documento elaborato con ${source === 'google' ? 'Google Cloud Vision' : 'Tesseract.js'}`);
+      // Show success message
+      toast.success("Documento elaborato con Tesseract.js");
 
-      // Auto-fill form fields from Google OCR parsed data
-      if (parsedFields.nome) setValue("nome", parsedFields.nome);
-      if (parsedFields.cognome) setValue("cognome", parsedFields.cognome);
-      if (parsedFields.codiceFiscale) setValue("codiceFiscale", parsedFields.codiceFiscale);
-      if (parsedFields.numeroDocumento) setValue("docNumero", parsedFields.numeroDocumento);
-      if (parsedFields.scadenza) setValue("docScadenza", parsedFields.scadenza);
+      // Detect document type and parse
+      const detectedType = detectDocType(text);
+      const parsed = parseFieldsByType(detectedType, text);
 
-      // If Google OCR didn't provide parsed fields, fallback to client-side parsing
-      if (source === 'tesseract' || Object.keys(parsedFields).length === 0) {
-        const clientDetectedType = detectDocType(text);
-        const clientParsed = parseFieldsByType(clientDetectedType, text);
-
-        if (clientParsed.nome && !parsedFields.nome) setValue("nome", clientParsed.nome);
-        if (clientParsed.cognome && !parsedFields.cognome) setValue("cognome", clientParsed.cognome);
-        if (clientParsed.codiceFiscale && !parsedFields.codiceFiscale) setValue("codiceFiscale", clientParsed.codiceFiscale);
-        if (clientParsed.numeroDocumento && !parsedFields.numeroDocumento) setValue("docNumero", clientParsed.numeroDocumento);
-        if (clientParsed.scadenza && !parsedFields.scadenza) setValue("docScadenza", clientParsed.scadenza);
-      }
+      // Auto-fill form fields
+      if (parsed.nome) setValue("nome", parsed.nome);
+      if (parsed.cognome) setValue("cognome", parsed.cognome);
+      if (parsed.codiceFiscale) setValue("codiceFiscale", parsed.codiceFiscale);
+      if (parsed.numeroDocumento) setValue("docNumero", parsed.numeroDocumento);
+      if (parsed.scadenza) setValue("docScadenza", parsed.scadenza);
 
       setDocumentUploaded(true);
-      setOcrSource(prev => ({ ...prev, doc: source }));
+      setOcrSource(prev => ({ ...prev, doc: 'tesseract' }));
 
       // Show info toast if detected type differs from selected
       const selectedDocType = watch("docTipo");
