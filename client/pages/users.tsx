@@ -81,91 +81,91 @@ export default function Users() {
     console.log("Modifica utente:", user);
   };
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        setLoading(true);
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
 
-        if (!db) {
-          // Fallback to mock data if Firebase not configured
-          const mockUsers: User[] = [
-            {
-              id: '1',
-              nome: 'Marco Amministratore',
-              email: 'marco.admin@sempliswitch.com',
-              ruolo: 'admin',
-              stato: 'attivo',
-              createdAt: '2024-01-15',
-              lastLogin: '2024-03-15'
-            },
-            {
-              id: '2',
-              nome: 'Giulia Supporto',
-              email: 'giulia.supporto@sempliswitch.com',
-              ruolo: 'back office',
-              stato: 'attivo',
-              createdAt: '2024-01-20',
-              lastLogin: '2024-03-14'
-            }
-          ];
-          setUsers(mockUsers);
-          setLoading(false);
-          return;
-        }
-
-        const querySnapshot = await getDocs(collection(db, "utenti"));
-        const usersFromFirebase: User[] = querySnapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            nome: `${data.nome || ''} ${data.cognome || ''}`.trim(),
-            email: data.email || '',
-            ruolo: data.ruolo || 'consulente',
-            stato: data.attivo ? "attivo" : "non attivo",
-            pianoCompensi: data.pianoCompensi || "",
-            gestoriAssegnati: data.gestoriAssegnati || [],
-            master: data.master || '',
-            createdAt: data.createdAt || "",
-            lastLogin: data.lastLogin || ""
-          };
-        });
-
-        const cleanedUsers = usersFromFirebase.filter(user =>
-          user.email && !user.email.includes('"') && !user.email.includes('*')
-        );
-        setUsers(cleanedUsers);
-      } catch (error) {
-        console.error("Errore nel recupero utenti da Firebase:", error);
-        toast({
-          variant: "destructive",
-          title: "Errore",
-          description: "Impossibile caricare gli utenti da Firebase"
-        });
-      } finally {
+      if (!db) {
+        // Fallback to mock data if Firebase not configured
+        const mockUsers: User[] = [
+          {
+            id: '1',
+            nome: 'Marco Amministratore',
+            email: 'marco.admin@sempliswitch.com',
+            ruolo: 'admin',
+            stato: 'attivo',
+            createdAt: '2024-01-15',
+            lastLogin: '2024-03-15'
+          },
+          {
+            id: '2',
+            nome: 'Giulia Supporto',
+            email: 'giulia.supporto@sempliswitch.com',
+            ruolo: 'back office',
+            stato: 'attivo',
+            createdAt: '2024-01-20',
+            lastLogin: '2024-03-14'
+          }
+        ];
+        setUsers(mockUsers);
         setLoading(false);
+        return;
       }
-    };
 
-    const fetchMasters = async () => {
-      try {
-        if (!db) {
-          setMasters([]);
-          return;
-        }
-
-        const q = query(collection(db, "utenti"), where("ruolo", "==", "master"));
-        const querySnapshot = await getDocs(q);
-        const mastersData = querySnapshot.docs.map(doc => ({
+      const querySnapshot = await getDocs(collection(db, "utenti"));
+      const usersFromFirebase: User[] = querySnapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
           id: doc.id,
-          nome: doc.data().nome,
-          cognome: doc.data().cognome || '',
-        }));
-        setMasters(mastersData);
-      } catch (error) {
-        console.error("Errore nel recupero dei master:", error);
-      }
-    };
+          nome: `${data.nome || ''} ${data.cognome || ''}`.trim(),
+          email: data.email || '',
+          ruolo: data.ruolo || 'consulente',
+          stato: data.attivo ? "attivo" : "non attivo",
+          pianoCompensi: data.pianoCompensi || "",
+          gestoriAssegnati: data.gestoriAssegnati || [],
+          master: data.master || '',
+          createdAt: data.createdAt || "",
+          lastLogin: data.lastLogin || ""
+        };
+      });
 
+      const cleanedUsers = usersFromFirebase.filter(user =>
+        user.email && !user.email.includes('"') && !user.email.includes('*')
+      );
+      setUsers(cleanedUsers);
+    } catch (error) {
+      console.error("Errore nel recupero utenti da Firebase:", error);
+      toast({
+        variant: "destructive",
+        title: "Errore",
+        description: "Impossibile caricare gli utenti da Firebase"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMasters = async () => {
+    try {
+      if (!db) {
+        setMasters([]);
+        return;
+      }
+
+      const q = query(collection(db, "utenti"), where("ruolo", "==", "master"));
+      const querySnapshot = await getDocs(q);
+      const mastersData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        nome: doc.data().nome,
+        cognome: doc.data().cognome || '',
+      }));
+      setMasters(mastersData);
+    } catch (error) {
+      console.error("Errore nel recupero dei master:", error);
+    }
+  };
+
+  useEffect(() => {
     fetchUsers();
     fetchMasters();
   }, []);
