@@ -285,6 +285,54 @@ export default function Users() {
     }
   };
 
+  const handleUpdateUser = async () => {
+    if (!formData.nome || !formData.email) {
+      toast({
+        variant: "destructive",
+        title: "Errore",
+        description: "Compila tutti i campi obbligatori"
+      });
+      return;
+    }
+
+    if (!selectedUser) return;
+
+    try {
+      // For now, update local state
+      // In production, this would call an API to update in Firebase
+      const updatedUsers = users.map(user =>
+        user.id === selectedUser.id
+          ? {
+              ...user,
+              nome: formData.nome,
+              ruolo: formData.ruolo,
+              stato: formData.stato ? 'attivo' : 'non attivo',
+              pianoCompensi: formData.pianoCompensi,
+              gestoriAssegnati: formData.gestoriAssegnati,
+              master: formData.master
+            }
+          : user
+      );
+
+      setUsers(updatedUsers);
+
+      toast({
+        title: "✅ Utente aggiornato con successo!",
+        description: `I dati di ${formData.nome} sono stati modificati`,
+      });
+
+      setIsEditModalOpen(false);
+      setSelectedUser(null);
+      resetForm();
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Errore",
+        description: "Aggiornamento utente fallito",
+      });
+    }
+  };
+
   const handleDeleteUser = (userId: string) => {
     setUsers(users.filter(u => u.id !== userId));
     toast({
