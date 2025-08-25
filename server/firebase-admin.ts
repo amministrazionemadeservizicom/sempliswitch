@@ -74,7 +74,7 @@ export const adminOperations = {
   // Get all contracts with admin privileges
   async getAllContracts() {
     try {
-      const snapshot = await adminDb.collection('contratti').get();
+      const snapshot = await adminDb.collection('contracts').get();
       return snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -88,7 +88,7 @@ export const adminOperations = {
   // Update contract status with admin privileges
   async updateContractStatus(contractId: string, status: string, notes?: string) {
     try {
-      await adminDb.collection('contratti').doc(contractId).update({
+      await adminDb.collection('contracts').doc(contractId).update({
         statoOfferta: status,
         noteStatoOfferta: notes || '',
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -123,7 +123,7 @@ export const adminOperations = {
       if (updateData.contatto) updateFields.contatto = updateData.contatto;
       if (updateData.ragioneSociale !== undefined) updateFields.ragioneSociale = updateData.ragioneSociale;
 
-      await adminDb.collection('contratti').doc(contractId).update(updateFields);
+      await adminDb.collection('contracts').doc(contractId).update(updateFields);
 
       console.log('✅ Contract updated:', contractId);
       return true;
@@ -136,7 +136,7 @@ export const adminOperations = {
   // Delete contract with admin privileges
   async deleteContract(contractId: string) {
     try {
-      await adminDb.collection('contratti').doc(contractId).delete();
+      await adminDb.collection('contracts').doc(contractId).delete();
       console.log('✅ Contract deleted:', contractId);
       return true;
     } catch (error) {
