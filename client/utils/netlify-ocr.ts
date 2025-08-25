@@ -72,12 +72,9 @@ export async function processDocumentOCR(files: File[]): Promise<{
       conf: 0.8 // High confidence for Google Vision
     };
 
-    // Detect document type from text (fallback)
-    const detectedType = detectDocType(text);
-
     return {
       text: text || '',
-      detectedType,
+      detectedType: 'UNKNOWN', // Will be calculated by the caller
       parsed,
       previews
     };
