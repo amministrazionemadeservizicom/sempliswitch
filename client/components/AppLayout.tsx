@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import Sidebar from "./Sidebar";
+import ProfileModal from "./ProfileModal";
 import { Button } from "@/components/ui/button";
 import { LogOut, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
