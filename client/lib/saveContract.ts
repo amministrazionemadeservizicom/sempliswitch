@@ -118,27 +118,30 @@ export async function saveContract({
       dettagliCliente: {
         cellulare: contractData.cliente.cellulare,
         email: contractData.cliente.email,
-        iban: contractData.cliente.iban
+        iban: contractData.cliente.iban || null
       },
       documento: contractData.documento,
       indirizzi: contractData.indirizzi,
       datiTecnici: {
-        pod: contractData.pod,
-        pdr: contractData.pdr,
-        potenzaImpegnataKw: contractData.potenzaImpegnataKw,
-        usiGas: contractData.usiGas,
-        residenziale: contractData.residenziale
+        pod: contractData.pod || null,
+        pdr: contractData.pdr || null,
+        potenzaImpegnataKw: contractData.potenzaImpegnataKw || null,
+        usiGas: contractData.usiGas || [],
+        residenziale: contractData.residenziale || null
       },
-      offerte: contractData.offerte,
-      
+      offerte: contractData.offerte || [],
+
       // Timestamps
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
 
-    console.log("💾 Saving contract to Firebase:", contractForFirebase);
+    // Clean undefined values from the entire object
+    const cleanedContract = cleanUndefinedValues(contractForFirebase);
 
-    const docRef = await addDoc(collection(db, "contratti"), contractForFirebase);
+    console.log("💾 Saving contract to Firebase:", cleanedContract);
+
+    const docRef = await addDoc(collection(db, "contratti"), cleanedContract);
     
     console.log("✅ Contract saved successfully with ID:", docRef.id);
     
