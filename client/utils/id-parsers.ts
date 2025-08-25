@@ -39,6 +39,44 @@ function toIsoDateLike(s?: string) {
 
 const CF_RE = /\b([A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z])\b/;
 
+// Helper function to extract clean field values
+function extractCleanField(text: string, pattern: RegExp): string | undefined {
+  const match = text.match(pattern);
+  if (!match) return undefined;
+
+  let value = match[1].trim();
+
+  // Skip descriptive/instructional text
+  const skipPatterns = [
+    /^E NOME DEL/i,
+    /^DEL PADRE/i,
+    /^DELLA MADRE/i,
+    /^O DI CHI/i,
+    /^NE FA LE VECI/i,
+    /^LUOGO E DATA/i,
+    /^DI NASCITA/i,
+    /^VALIDA PER/i,
+    /^FINO AL/i,
+    /^CITTADINANZA/i,
+    /^STATURA/i,
+    /^DOCUMENTO/i,
+    /^RILASCIATO/i
+  ];
+
+  if (skipPatterns.some(pattern => pattern.test(value))) {
+    return undefined;
+  }
+
+  // Stop at common separators or new field indicators
+  value = value.split(/\b(?:COGNOME|NOME|NATO|RILASCIATO|SCADENZA|CITTADINANZA|STATURA)\b/i)[0].trim();
+
+  // Must be reasonable length and not all caps descriptive text
+  if (value.length < 2 || value.length > 50) return undefined;
+  if (value.length > 20 && value === value.toUpperCase()) return undefined;
+
+  return value;
+}
+
 // Parser CIE (solo da testo OCR + MRZ semplificata)
 export function parseCIE(text: string): ParsedFields {
   const t = text.replace(/\s+/g," ").trim();
@@ -64,9 +102,14 @@ export function parseCIE(text: string): ParsedFields {
     // Data nascita/scadenza presenti in L3 (yyMMdd). Qui lasciamo vuoto: serve parser MRZ vero per sicurezza.
   }
 
-  // Fallback da label italiane
-  nome ||= (t.match(/NOME[:\s]+([A-ZÀ-Ù' -]+)/i)?.[1] || "").trim();
-  cognome ||= (t.match(/COGNOME[:\s]+([A-ZÀ-Ù' -]+)/i)?.[1] || "").trim();
+  // Fallback da label italiane - with improved extraction
+  if (!nome) {
+    nome = extractCleanField(t, /\bNOME[:\s]+([A-ZÀ-Ù' -]+)/i);
+  }
+  if (!cognome) {
+    cognome = extractCleanField(t, /\bCOGNOME[:\s]+([A-ZÀ-Ù' -]+)/i);
+  }
+
   dataNascita = toIsoDateLike(t.match(/NATO.*?(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i)?.[1]);
   scadenza = toIsoDateLike(t.match(/SCADENZA[:\s]+(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i)?.[1]);
   const cf = t.match(CF_RE)?.[1];
@@ -82,10 +125,10 @@ export function parseCIE(text: string): ParsedFields {
 export function parseCartaVecchia(text: string): ParsedFields {
   const t = text.replace(/\s+/g," ").trim();
   return {
-    nome: (t.match(/NOME[:\s]+([A-ZÀ-Ù' -]+)/i)?.[1] || "").trim() || undefined,
-    cognome: (t.match(/COGNOME[:\s]+([A-ZÀ-Ù' -]+)/i)?.[1] || "").trim() || undefined,
+    nome: extractCleanField(t, /\bNOME[:\s]+([A-ZÀ-Ù' -]+)/i),
+    cognome: extractCleanField(t, /\bCOGNOME[:\s]+([A-ZÀ-Ù' -]+)/i),
     dataNascita: toIsoDateLike(t.match(/NATO.*?(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i)?.[1]),
-    luogoNascita: (t.match(/NATO A[:\s]+([A-ZÀ-Ù' -]+)/i)?.[1] || "").trim() || undefined,
+    luogoNascita: extractCleanField(t, /NATO A[:\s]+([A-ZÀ-Ù' -]+)/i),
     numeroDocumento: (t.match(/N\.\s*([A-Z0-9/-]+)/i)?.[1] || "").trim() || undefined,
     scadenza: toIsoDateLike(t.match(/SCADENZA[:\s]+(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i)?.[1]),
     codiceFiscale: t.match(CF_RE)?.[1]?.toUpperCase(),
@@ -100,8 +143,8 @@ export function parsePatente(text: string): ParsedFields {
                  || t.match(/\b([A-Z0-9]{8,})\b/)?.[1];
 
   return {
-    nome: (t.match(/NOME[:\s]+([A-ZÀ-Ù' -]+)/i)?.[1] || "").trim() || undefined,
-    cognome: (t.match(/COGNOME[:\s]+([A-ZÀ-Ù' -]+)/i)?.[1] || "").trim() || undefined,
+    nome: extractCleanField(t, /\bNOME[:\s]+([A-ZÀ-Ù' -]+)/i),
+    cognome: extractCleanField(t, /\bCOGNOME[:\s]+([A-ZÀ-Ù' -]+)/i),
     dataNascita: toIsoDateLike(t.match(/NATO.*?(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i)?.[1]),
     numeroDocumento: numeroDoc || undefined,
     scadenza: toIsoDateLike(t.match(/SCADENZA[:\s]+(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i)?.[1]),
@@ -114,8 +157,8 @@ export function parsePassaporto(text: string): ParsedFields {
   // Per estrazione seria serve parser MRZ TD3; qui lasciamo base
   const t = text.replace(/\s+/g," ").trim();
   return {
-    nome: (t.match(/NOME[:\s]+([A-ZÀ-Ù' -]+)/i)?.[1] || "").trim() || undefined,
-    cognome: (t.match(/COGNOME[:\s]+([A-ZÀ-Ù' -]+)/i)?.[1] || "").trim() || undefined,
+    nome: extractCleanField(t, /\bNOME[:\s]+([A-ZÀ-Ù' -]+)/i),
+    cognome: extractCleanField(t, /\bCOGNOME[:\s]+([A-ZÀ-Ù' -]+)/i),
     numeroDocumento: (t.match(/N\.\s*PASSAPORTO[:\s]*([A-Z0-9/-]+)/i)?.[1] || "").trim() || undefined,
     conf: 0.4
   };
