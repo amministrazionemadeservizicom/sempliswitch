@@ -324,10 +324,17 @@ export default function Sidebar({ userRole, isCollapsed = false, onToggle, userF
 
             {/* User Info + Logout in Mobile Menu */}
             <div className="p-4 border-t border-yellow-600 border-opacity-30 space-y-3">
-              <div className="text-sm text-[#333333]">
+              <button
+                onClick={() => {
+                  onUserClick?.();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="text-sm text-[#333333] w-full text-left p-2 hover:bg-black hover:bg-opacity-5 rounded-lg transition-colors"
+              >
                 <div className="font-medium">{userFullName}</div>
                 <div className="capitalize text-xs opacity-70">{userRole}</div>
-              </div>
+                <div className="text-xs opacity-50 mt-1">Clicca per modificare profilo</div>
+              </button>
               <button
                 onClick={() => {
                   handleLogout();
