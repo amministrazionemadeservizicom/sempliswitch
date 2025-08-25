@@ -334,14 +334,6 @@ export default function Users() {
     }
   };
 
-  const handleDeleteUser = (userId: string) => {
-    setUsers(users.filter(u => u.id !== userId));
-    toast({
-      title: "Utente eliminato",
-      description: "L'utente è stato rimosso dal sistema",
-    });
-  };
-
   const getRoleBadge = (ruolo: User['ruolo']) => {
     const variants = {
       'admin': 'destructive',
