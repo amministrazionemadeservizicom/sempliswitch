@@ -399,6 +399,7 @@ export default function CompileContract() {
       }
 
       setDocumentUploaded(true);
+      setOcrSource(prev => ({ ...prev, doc: source }));
 
       // Show info toast if detected type differs from selected
       const selectedDocType = watch("docTipo");
