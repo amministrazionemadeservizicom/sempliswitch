@@ -261,8 +261,8 @@ export default function Contracts() {
               </p>
             </div>
             
-            <Link to="/new-practice">
-              <Button 
+            <Link to="/compile-contract">
+              <Button
                 className="shadow-md"
                 style={{ backgroundColor: '#F2C927', color: '#333333' }}
               >
