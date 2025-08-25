@@ -33,7 +33,7 @@ export default async (request: Request, context: Context) => {
         }), { status: 200, headers });
 
       case 'PUT':
-        // Update contract status
+        // Update contract status or full contract
         if (!contractId) {
           return new Response(JSON.stringify({
             error: 'Contract ID is required'
@@ -41,11 +41,23 @@ export default async (request: Request, context: Context) => {
         }
 
         const updateData = await request.json();
-        await adminOperations.updateContractStatus(
-          contractId,
-          updateData.status,
-          updateData.notes
-        );
+
+        if (updateData.action === 'updateFull') {
+          // Full contract update
+          await adminOperations.updateContract(contractId, {
+            statoOfferta: updateData.statoOfferta,
+            noteStatoOfferta: updateData.noteStatoOfferta,
+            contatto: updateData.contatto,
+            ragioneSociale: updateData.ragioneSociale
+          });
+        } else {
+          // Status update only (backward compatibility)
+          await adminOperations.updateContractStatus(
+            contractId,
+            updateData.status,
+            updateData.notes
+          );
+        }
 
         return new Response(JSON.stringify({
           success: true,
