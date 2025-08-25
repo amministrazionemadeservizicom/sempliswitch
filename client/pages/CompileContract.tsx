@@ -764,6 +764,16 @@ export default function CompileContract() {
                     </AlertDescription>
                   </Alert>
                 )}
+
+                {/* Camera Error */}
+                {cameraError && (
+                  <Alert className="border-red-200 bg-red-50">
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                    <AlertDescription className="text-red-600">
+                      {cameraError}
+                    </AlertDescription>
+                  </Alert>
+                )}
                 
                 {/* Document Previews */}
                 {docPreviews.length > 0 && (
