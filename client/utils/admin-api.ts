@@ -166,11 +166,76 @@ export const adminApi: AdminApiInterface = {
     }
   },
 
+  // Save contract using admin privileges (SECURE)
+  async saveContract(contractData: {
+    cliente: {
+      nome: string;
+      cognome: string;
+      codiceFiscale: string;
+      cellulare: string;
+      email: string;
+      iban?: string;
+    };
+    documento: {
+      tipo: string;
+      numero?: string;
+      rilasciatoDa: string;
+      dataRilascio: string;
+      dataScadenza: string;
+    };
+    indirizzi: {
+      residenza: {
+        via: string;
+        civico: string;
+        citta: string;
+        cap: string;
+      };
+      fornitura: {
+        via: string;
+        civico: string;
+        citta: string;
+        cap: string;
+      };
+    };
+    pod?: string;
+    pdr?: string;
+    potenzaImpegnataKw?: number;
+    usiGas?: string[];
+    residenziale?: string;
+    offerte: any[];
+  }, userId: string, userName: string, userSurname: string, masterReference?: string) {
+    try {
+      const response = await fetch('/.netlify/functions/save-contract', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contractData,
+          userId,
+          userName,
+          userSurname,
+          masterReference: masterReference || ''
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result.data;
+    } catch (error: any) {
+      console.error('❌ Error saving contract via admin API:', error);
+      throw error;
+    }
+  },
+
   // Test Firebase Admin SDK
   async testFirebaseAdmin() {
     try {
       const response = await fetch('/.netlify/functions/test-firebase-admin');
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
