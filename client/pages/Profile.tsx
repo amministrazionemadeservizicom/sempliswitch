@@ -83,17 +83,23 @@ export default function Profile() {
   });
 
   useEffect(() => {
+    console.log('🔍 Profile page - currentUser:', currentUser);
+    console.log('🔍 Profile page - userRole:', userRole);
+    console.log('🔍 Profile page - localStorage uid:', localStorage.getItem('uid'));
+    console.log('🔍 Profile page - localStorage userRole:', localStorage.getItem('userRole'));
     fetchUserData();
   }, [currentUser]);
 
   const fetchUserData = async () => {
     if (!currentUser?.uid) {
+      console.log('❌ Profile: No currentUser.uid, redirecting to login');
       navigate('/');
       return;
     }
 
     try {
       setLoading(true);
+      console.log('📡 Profile: Fetching user data for uid:', currentUser.uid);
       const userDoc = await getDoc(doc(db, "utenti", currentUser.uid));
       
       if (userDoc.exists()) {
