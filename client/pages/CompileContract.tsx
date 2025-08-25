@@ -390,7 +390,7 @@ export default function CompileContract() {
       let filledFields = 0;
       if (parsed.nome) {
         setValue("nome", parsed.nome);
-        console.log("��� Nome compilato:", parsed.nome);
+        console.log("✅ Nome compilato:", parsed.nome);
         filledFields++;
       }
       if (parsed.cognome) {
@@ -636,24 +636,25 @@ export default function CompileContract() {
         offerte: selectedOffers
       };
       
-      // Save to localStorage (in real app would be database)
-      const existingContracts = JSON.parse(localStorage.getItem('contracts') || '[]');
-      const newContract = {
-        ...contractData,
-        id: Date.now().toString(),
-        consulenteId: 'user1',
-        stato: 'da_verificare',
-        dataCreazione: new Date().toISOString(),
-        ultimaModifica: new Date().toISOString()
-      };
-      existingContracts.push(newContract);
-      localStorage.setItem('contracts', JSON.stringify(existingContracts));
-      
+      // Save to Firebase
+      if (!currentUser) {
+        toast.error("Utente non autenticato");
+        return;
+      }
+
+      const result = await saveContract({
+        contractData,
+        userId: currentUser.uid,
+        userName: currentUser.displayName?.split(' ')[0] || 'Nome',
+        userSurname: currentUser.displayName?.split(' ')[1] || 'Cognome',
+        masterReference: '' // TODO: Get from user data if consulente
+      });
+
       // Clear cart
       localStorage.removeItem('selectedOffers');
       localStorage.removeItem('selectedOffer');
-      
-      toast.success("Contratto inviato con successo!");
+
+      toast.success(`Contratto salvato con successo! Codice: ${result.codiceUnivocoOfferta}`);
       navigate("/contracts");
       
     } catch (error) {
