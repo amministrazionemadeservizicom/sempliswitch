@@ -67,7 +67,7 @@ export default function AppLayout({
   };
 
   const handleUserClick = () => {
-    setIsProfileModalOpen(true);
+    navigate('/profile');
   };
 
   const handleLogout = () => {
@@ -107,9 +107,10 @@ export default function AppLayout({
                 onClick={handleUserClick}
                 className="text-sm hover:bg-black hover:bg-opacity-10 px-2 py-1 rounded-lg transition-colors"
                 style={{ color: '#333333' }}
+                title="Vai al mio profilo"
               >
                 <User className="h-4 w-4 inline mr-1" />
-                {userFullName}
+                {userFullName || 'Utente'}
               </button>
               <Button
                 variant="ghost"
@@ -138,9 +139,10 @@ export default function AppLayout({
               <button
                 onClick={handleUserClick}
                 className="text-sm font-semibold text-gray-800 hover:bg-black hover:bg-opacity-10 px-3 py-1 rounded-lg transition-colors"
+                title="Vai al mio profilo"
               >
                 <User className="h-4 w-4 inline mr-1" />
-                {userFullName}
+                {userFullName || 'Utente'}
               </button>
               <Button
                 variant="ghost"
