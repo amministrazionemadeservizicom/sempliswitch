@@ -185,12 +185,13 @@ export default function Sidebar({ userRole, isCollapsed = false, onToggle, userF
         <div className="p-4 border-t border-yellow-600 border-opacity-30 space-y-3">
           {isCollapsed ? (
             <>
-              <div
-               className="flex items-center justify-center w-8 h-8 bg-black rounded-full text-yellow-400 font-semibold text-sm mx-auto"
-                title={userFullName}
+              <button
+                onClick={onUserClick}
+                className="flex items-center justify-center w-8 h-8 bg-black rounded-full text-yellow-400 font-semibold text-sm mx-auto hover:bg-opacity-80 transition-all"
+                title={`${userFullName} - Clicca per modificare profilo`}
               >
                 {initials}
-              </div>
+              </button>
               <button
                 onClick={handleLogout}
                 className="flex items-center justify-center w-full text-[#333333] hover:text-red-600 transition"
@@ -201,10 +202,14 @@ export default function Sidebar({ userRole, isCollapsed = false, onToggle, userF
             </>
           ) : (
             <>
-              <div className="text-sm text-[#333333]">
+              <button
+                onClick={onUserClick}
+                className="text-sm text-[#333333] w-full text-left p-2 hover:bg-black hover:bg-opacity-5 rounded-lg transition-colors"
+              >
                 <div className="font-medium">{userFullName}</div>
                 <div className="capitalize text-xs opacity-70">{userRole}</div>
-              </div>
+                <div className="text-xs opacity-50 mt-1">Clicca per modificare profilo</div>
+              </button>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 text-sm text-[#333333] hover:text-red-600 transition"
