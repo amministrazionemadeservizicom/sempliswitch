@@ -755,6 +755,124 @@ export default function Contracts() {
             </DialogContent>
           </Dialog>
 
+          {/* Modal per modifica contratto */}
+          <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+            <DialogContent className="sm:max-w-2xl font-roboto">
+              <DialogHeader>
+                <DialogTitle>Modifica Contratto</DialogTitle>
+                <DialogDescription>
+                  Contratto: {editingContract?.codiceUnivocoOfferta}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-4 max-h-96 overflow-y-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="editNome">Nome</Label>
+                    <Input
+                      id="editNome"
+                      value={editContractData.contatto.nome}
+                      onChange={(e) => setEditContractData({
+                        ...editContractData,
+                        contatto: { ...editContractData.contatto, nome: e.target.value }
+                      })}
+                      className="rounded-2xl"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="editCognome">Cognome</Label>
+                    <Input
+                      id="editCognome"
+                      value={editContractData.contatto.cognome}
+                      onChange={(e) => setEditContractData({
+                        ...editContractData,
+                        contatto: { ...editContractData.contatto, cognome: e.target.value }
+                      })}
+                      className="rounded-2xl"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="editCodiceFiscale">Codice Fiscale</Label>
+                  <Input
+                    id="editCodiceFiscale"
+                    value={editContractData.contatto.codiceFiscale}
+                    onChange={(e) => setEditContractData({
+                      ...editContractData,
+                      contatto: { ...editContractData.contatto, codiceFiscale: e.target.value }
+                    })}
+                    className="rounded-2xl"
+                  />
+                </div>
+
+                {editingContract?.isBusiness && (
+                  <div>
+                    <Label htmlFor="editRagioneSociale">Ragione Sociale</Label>
+                    <Input
+                      id="editRagioneSociale"
+                      value={editContractData.ragioneSociale}
+                      onChange={(e) => setEditContractData({
+                        ...editContractData,
+                        ragioneSociale: e.target.value
+                      })}
+                      className="rounded-2xl"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <Label htmlFor="editStato">Stato Offerta</Label>
+                  <Select
+                    value={editContractData.statoOfferta}
+                    onValueChange={(value: Contract['statoOfferta']) =>
+                      setEditContractData({ ...editContractData, statoOfferta: value })
+                    }
+                  >
+                    <SelectTrigger className="rounded-2xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Caricato">Caricato</SelectItem>
+                      <SelectItem value="Inserito">Inserito</SelectItem>
+                      <SelectItem value="Inserimento OK">Inserimento OK</SelectItem>
+                      <SelectItem value="Pagato">Pagato</SelectItem>
+                      <SelectItem value="Annullato">Annullato</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="editNote">Note Stato Offerta</Label>
+                  <Textarea
+                    id="editNote"
+                    value={editContractData.noteStatoOfferta}
+                    onChange={(e) => setEditContractData({
+                      ...editContractData,
+                      noteStatoOfferta: e.target.value
+                    })}
+                    placeholder="Inserisci note..."
+                    className="rounded-2xl"
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+                  Annulla
+                </Button>
+                <Button
+                  onClick={handleUpdateContract}
+                  style={{ backgroundColor: '#F2C927', color: '#333333' }}
+                >
+                  Salva Modifiche
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
         </div>
       </div>
     </AppLayout>
