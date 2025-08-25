@@ -44,13 +44,51 @@ function toIsoDateLike(s?: string) {
   return `${y}-${mm}-${dd}`;
 }
 
+// Helper function to extract clean field values
+function extractCleanField(text: string, pattern: RegExp): string | undefined {
+  const match = text.match(pattern);
+  if (!match) return undefined;
+
+  let value = match[1].trim();
+
+  // Skip descriptive/instructional text
+  const skipPatterns = [
+    /^E NOME DEL/i,
+    /^DEL PADRE/i,
+    /^DELLA MADRE/i,
+    /^O DI CHI/i,
+    /^NE FA LE VECI/i,
+    /^LUOGO E DATA/i,
+    /^DI NASCITA/i,
+    /^VALIDA PER/i,
+    /^FINO AL/i,
+    /^CITTADINANZA/i,
+    /^STATURA/i,
+    /^DOCUMENTO/i,
+    /^RILASCIATO/i
+  ];
+
+  if (skipPatterns.some(pattern => pattern.test(value))) {
+    return undefined;
+  }
+
+  // Stop at common separators or new field indicators
+  value = value.split(/\b(?:COGNOME|NOME|NATO|RILASCIATO|SCADENZA|CITTADINANZA|STATURA)\b/i)[0].trim();
+
+  // Must be reasonable length and not all caps descriptive text
+  if (value.length < 2 || value.length > 50) return undefined;
+  if (value.length > 20 && value === value.toUpperCase()) return undefined;
+
+  return value;
+}
+
 function parseFieldsByType(type: DocType, text: string): ParsedFields {
   const t = text.replace(/\s+/g," ").trim();
   const CF_RE = /\b([A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z])\b/;
 
-  // Basic parsing for all document types
-  const nome = (t.match(/NOME[:\s]+([A-ZÀ-Ù' -]+)/i)?.[1] || "").trim() || undefined;
-  const cognome = (t.match(/COGNOME[:\s]+([A-ZÀ-Ù' -]+)/i)?.[1] || "").trim() || undefined;
+  // Improved parsing for all document types
+  const nome = extractCleanField(t, /\bNOME[:\s]+([A-ZÀ-Ù' -]+)/i);
+  const cognome = extractCleanField(t, /\bCOGNOME[:\s]+([A-ZÀ-Ù' -]+)/i);
   const dataNascita = toIsoDateLike(t.match(/NATO.*?(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i)?.[1]);
   const scadenza = toIsoDateLike(t.match(/SCADENZA[:\s]+(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i)?.[1]);
   const codiceFiscale = t.match(CF_RE)?.[1]?.toUpperCase();
