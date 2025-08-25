@@ -149,12 +149,11 @@ async function extractFromPDF(file: File) {
   return { text: fullText.trim(), previewUrls: previews };
 }
 
-// 🔥 Gestione immagini
+// 🔥 Gestione immagini veloce
 async function extractFromImage(file: File) {
   const url = URL.createObjectURL(file);
   const canvas = await canvasFromImage(file);
-  const psms = [PSM.SINGLE_BLOCK, PSM.AUTO, PSM.SPARSE_TEXT];
-  const result = await runWithTimeout(tryRotations(canvas, psms), 30000);
+  const result = await runWithTimeout(fastOCR(canvas), 10000); // Ridotto a 10s
   return { text: result.text, previewUrls: [url] };
 }
 
