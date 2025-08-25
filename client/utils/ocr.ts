@@ -220,14 +220,9 @@ export async function extractTextFromFiles(files: File[]) {
         const ext = (file.name.split(".").pop() || "").toLowerCase();
 
         if (ext === "pdf") {
-          console.log('📋 Processing PDF...');
-          const { text, previewUrls } = await extractFromPDF(file);
-          console.log('📋 PDF text length:', text.length);
-          allText += `\n\n=== ${file.name} ===\n${text}`;
-          previewUrls.forEach((url, idx) => {
-            pages.push({ filename: file.name, page: idx + 1, text: "", previewUrl: url });
-          });
-          previewsAll.push(...previewUrls);
+          console.log('📋 PDF processing disabled temporarily due to worker issues');
+          console.warn('⚠️ Per elaborare PDF, convertire in immagini JPG/PNG');
+          throw new Error(`PDF non supportato al momento. Converti "${file.name}" in immagini JPG/PNG.`);
         } else {
           console.log('🖼️ Processing image...');
           const { text, previewUrls } = await extractFromImage(file);
