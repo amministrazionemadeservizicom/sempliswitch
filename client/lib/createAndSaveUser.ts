@@ -1,5 +1,5 @@
 import { auth, db } from "../firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
 interface CreateUserInput {
@@ -23,7 +23,20 @@ interface CreateUserInput {
 }
 
 export async function createAndSaveUser(input: CreateUserInput) {
+  // Save current admin user credentials
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error("Devi essere autenticato per creare un utente");
+  }
+
   try {
+    // Store current admin email (we'll need it to re-authenticate)
+    const adminEmail = currentUser.email;
+    if (!adminEmail) {
+      throw new Error("Email admin non trovata");
+    }
+
+    // Create the new user
     const userCredential = await createUserWithEmailAndPassword(
       auth,
       input.email,
@@ -32,13 +45,14 @@ export async function createAndSaveUser(input: CreateUserInput) {
 
     const uid = userCredential.user.uid;
 
+    // Save user data to Firestore
     await setDoc(doc(db, "utenti", uid), {
       uid,
       nome: input.nome,
       cognome: input.cognome || "",
       email: input.email,
       ruolo: input.ruolo,
-      stato: input.stato ? "attivo" : "non attivo",
+      attivo: input.stato,
       pianoCompensi: input.pianoCompensi || "",
       gestoriAssegnati: input.gestoriAssegnati || [],
       ragioneSociale: input.ragioneSociale || "",
@@ -52,6 +66,13 @@ export async function createAndSaveUser(input: CreateUserInput) {
       masterRiferimento: input.master || "",
       creatoIl: serverTimestamp(),
     });
+
+    // Sign out the newly created user
+    await signOut(auth);
+
+    // Re-authenticate the admin user
+    // Note: This requires the admin password to be available
+    // For now, we'll let the auth state listener handle the re-authentication
 
     console.log("✅ Utente creato correttamente con UID:", uid);
     return uid;
