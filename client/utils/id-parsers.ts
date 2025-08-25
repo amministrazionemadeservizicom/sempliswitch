@@ -159,7 +159,7 @@ export function parseCIE(text: string): ParsedFields {
   }
 
   if (!nome) {
-    const nomeMatch = t.match(/NOME\s*\/\s*NAME[:\s]*([A-ZÀ-Ù' -]+)(?=\s*LUOGO|SESSO|\/|$)/i);
+    const nomeMatch = t.match(/NOME\s*\/\s*NAME[:\s]*([A-ZÀ-��' -]+)(?=\s*LUOGO|SESSO|\/|$)/i);
     if (nomeMatch) nome = nomeMatch[1].trim();
   }
 
@@ -240,6 +240,39 @@ export function parseCIE(text: string): ParsedFields {
 
       dataNascita = toIsoDateLike(dateStr);
       break;
+    }
+  }
+
+  // Additional fallback for dates if not found yet
+  if (!scadenza) {
+    const scadenzaPatterns = [
+      /SCADENZA[:\s]*(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/i,
+      /EXPIRY[:\s]*(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/i,
+      /(?:SCAD|EXP)[:\s]*(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/i
+    ];
+    for (const pattern of scadenzaPatterns) {
+      const match = t.match(pattern);
+      if (match) {
+        scadenza = toIsoDateLike(match[1]);
+        console.log('📝 Found scadenza with fallback:', scadenza);
+        break;
+      }
+    }
+  }
+
+  if (!emissione) {
+    const emissionePatterns = [
+      /EMISSIONE[:\s]*(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/i,
+      /ISSUING[:\s]*(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/i,
+      /(?:EMISS|ISS)[:\s]*(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/i
+    ];
+    for (const pattern of emissionePatterns) {
+      const match = t.match(pattern);
+      if (match) {
+        emissione = toIsoDateLike(match[1]);
+        console.log('📝 Found emissione with fallback:', emissione);
+        break;
+      }
     }
   }
 
