@@ -220,7 +220,7 @@ function parseBillData(text: string) {
 
 export default function CompileContract() {
   const navigate = useNavigate();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, userData } = useAuth();
   const [selectedOffers, setSelectedOffers] = useState<Offer[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
