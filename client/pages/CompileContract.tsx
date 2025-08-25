@@ -426,7 +426,40 @@ export default function CompileContract() {
       setOcrLoading(false);
     }
   };
-  
+
+  // Handle document photo capture (mobile only)
+  const handleDocumentCapture = async () => {
+    if (!isMobile) {
+      toast.error('Funzione disponibile solo su dispositivi mobili');
+      return;
+    }
+
+    clearError(); // Clear any previous camera errors
+
+    try {
+      const capturedFile = await capturePhoto();
+
+      if (capturedFile) {
+        console.log('📸 Foto catturata:', capturedFile.name);
+
+        // Process the captured photo like a regular upload
+        const fileList = {
+          0: capturedFile,
+          length: 1,
+          item: (index: number) => index === 0 ? capturedFile : null,
+          [Symbol.iterator]: function* () {
+            yield capturedFile;
+          }
+        } as FileList;
+
+        await handleDocumentUpload(fileList);
+      }
+    } catch (error) {
+      console.error('❌ Errore cattura foto:', error);
+      toast.error('Errore durante la cattura della foto');
+    }
+  };
+
   // Handle bill upload with OCR (Netlify Functions)
   const handleBillUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
