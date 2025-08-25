@@ -109,11 +109,39 @@ export default function Contracts() {
         return;
       }
 
-      console.log("📡 Attempting to fetch from 'contratti' collection...");
-      const querySnapshot = await getDocs(collection(db, "contratti"));
-      console.log("📊 Contratti trovati:", querySnapshot.size);
-      console.log("📋 Query snapshot:", querySnapshot);
-        
+      // Try Admin API first for better security and consistency
+      try {
+        console.log("📡 Attempting to fetch contracts via Admin API...");
+        const contractsFromAdmin = await adminApi.getAllContracts();
+        console.log("📊 Contratti trovati via Admin API:", contractsFromAdmin.length);
+
+        const formattedContracts: Contract[] = contractsFromAdmin.map((doc: any) => ({
+          id: doc.id,
+          codiceUnivocoOfferta: doc.codiceUnivocoOfferta || '',
+          dataCreazione: doc.dataCreazione || '',
+          creatoDa: doc.creatoDa || { id: '', nome: '', cognome: '' },
+          contatto: doc.contatto || { nome: '', cognome: '', codiceFiscale: '' },
+          ragioneSociale: doc.ragioneSociale || '',
+          isBusiness: doc.isBusiness || false,
+          statoOfferta: doc.statoOfferta || 'Caricato',
+          noteStatoOfferta: doc.noteStatoOfferta || '',
+          gestore: doc.gestore || '',
+          filePath: doc.filePath || '',
+          masterReference: doc.masterReference || '',
+          tipologiaContratto: doc.tipologiaContratto || 'energia'
+        }));
+
+        setContracts(formattedContracts);
+        console.log("✅ CONTRATTI CARICATI CON SUCCESSO VIA ADMIN API:", formattedContracts);
+      } catch (adminError) {
+        console.warn("⚠️ Admin API failed, falling back to direct Firebase access:", adminError);
+
+        // Fallback to direct Firebase access
+        console.log("📡 Attempting to fetch from 'contracts' collection...");
+        const querySnapshot = await getDocs(collection(db, "contracts"));
+        console.log("📊 Contratti trovati:", querySnapshot.size);
+        console.log("📋 Query snapshot:", querySnapshot);
+
         const contractsFromFirebase: Contract[] = querySnapshot.docs.map((doc) => {
           const data = doc.data();
           return {
@@ -132,9 +160,10 @@ export default function Contracts() {
             tipologiaContratto: data.tipologiaContratto || 'energia'
           };
         });
-        
+
         setContracts(contractsFromFirebase);
         console.log("✅ CONTRATTI CARICATI CON SUCCESSO:", contractsFromFirebase);
+      }
       } catch (error) {
         console.error("❌ Errore nel recupero contratti da Firebase:", error);
         toast({
