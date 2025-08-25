@@ -19,12 +19,20 @@ export function useAuth(): AuthReturn {
     const storedRole = localStorage.getItem("userRole");
     const storedUID = localStorage.getItem("uid");
     const storedUserName = localStorage.getItem("userName");
+    const storedUserEmail = localStorage.getItem("userEmail");
+
+    console.log('🔍 useAuth: localStorage data:', {
+      storedRole,
+      storedUID,
+      storedUserName,
+      storedUserEmail
+    });
 
     if (storedRole && storedUID) {
       // Create a user object from localStorage data
       const localUser = {
         uid: storedUID,
-        email: localStorage.getItem("userEmail") || '',
+        email: storedUserEmail || '',
         displayName: storedUserName || 'Utente'
       };
 
@@ -37,13 +45,24 @@ export function useAuth(): AuthReturn {
         cognome: storedUserName?.split(' ')[1] || '',
         fullName: storedUserName || 'Utente'
       });
+
+      console.log('✅ useAuth: Set user data from localStorage:', {
+        uid: storedUID,
+        role: storedRole,
+        name: storedUserName
+      });
+    } else {
+      console.log('⚠️ useAuth: No complete localStorage data found');
     }
 
     // Only try Firebase if we don't have localStorage data or to sync updates
     const unsubscribe = onAuthStateChanged(getAuth(), async (firebaseUser) => {
+      console.log('🔥 useAuth: Firebase auth state changed:', firebaseUser ? 'User found' : 'No user');
+
       if (firebaseUser) {
         // Update with Firebase user if available
         setUser(firebaseUser);
+        console.log('✅ useAuth: Firebase user authenticated:', firebaseUser.uid);
 
         try {
           const docRef = doc(db, "utenti", firebaseUser.uid);
