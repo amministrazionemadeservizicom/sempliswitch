@@ -73,7 +73,6 @@ export async function processDocumentOCR(files: File[]): Promise<{
 
     return {
       text: text || '',
-      detectedType: 'UNKNOWN', // Will be calculated by the caller
       parsed,
       previews
     };
