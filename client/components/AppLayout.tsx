@@ -159,9 +159,15 @@ export default function AppLayout({
         <main className="flex-1 overflow-y-auto pb-[calc(72px+env(safe-area-inset-bottom))] lg:pb-0">
           {children}
         </main>
-
-    
       </div>
+
+      {/* Profile Modal */}
+      <ProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        userData={userData}
+        onUserDataUpdate={handleUserDataUpdate}
+      />
     </div>
   );
 }
