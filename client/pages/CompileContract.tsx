@@ -220,6 +220,7 @@ function parseBillData(text: string) {
 
 export default function CompileContract() {
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
   const [selectedOffers, setSelectedOffers] = useState<Offer[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -389,7 +390,7 @@ export default function CompileContract() {
       let filledFields = 0;
       if (parsed.nome) {
         setValue("nome", parsed.nome);
-        console.log("✅ Nome compilato:", parsed.nome);
+        console.log("��� Nome compilato:", parsed.nome);
         filledFields++;
       }
       if (parsed.cognome) {
