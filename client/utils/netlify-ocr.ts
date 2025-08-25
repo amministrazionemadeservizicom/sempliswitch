@@ -13,6 +13,19 @@ type ParsedFields = {
 
 const OCR_ENDPOINT = 'https://sempliswitch.it/.netlify/functions/ocr';
 
+// Test if Netlify endpoint is available
+async function testNetlifyEndpoint(): Promise<boolean> {
+  try {
+    const response = await fetch(OCR_ENDPOINT, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 // OCR for identity documents using Netlify Functions
 export async function processDocumentOCR(files: File[]): Promise<{
   text: string;
