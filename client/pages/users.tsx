@@ -307,11 +307,11 @@ export default function Users() {
               ...user,
               nome: formData.nome,
               ruolo: formData.ruolo,
-              stato: formData.stato ? 'attivo' : 'non attivo',
+              stato: formData.stato ? 'attivo' as const : 'non attivo' as const,
               pianoCompensi: formData.pianoCompensi,
               gestoriAssegnati: formData.gestoriAssegnati,
               master: formData.master
-            }
+            } as User
           : user
       );
 
