@@ -70,6 +70,16 @@ const LoginForm = () => {
 
         setMessage(`✅ Accesso effettuato come ${user.email}`);
 
+        // Test localStorage data immediately
+        setTimeout(() => {
+          console.log('🧪 Test: localStorage after login:', {
+            uid: localStorage.getItem('uid'),
+            userName: localStorage.getItem('userName'),
+            userRole: localStorage.getItem('userRole'),
+            userEmail: localStorage.getItem('userEmail')
+          });
+        }, 500);
+
         setTimeout(() => {
           if (role === "admin") {
             navigate("/admin-dashboard");
