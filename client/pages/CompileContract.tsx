@@ -83,7 +83,11 @@ const createValidationSchema = (selectedOffer?: Offer) => {
     // POD/PDR condizionale
     pod: z.string().optional(),
     pdr: z.string().optional(),
-    
+
+    // Dati tecnici
+    potenzaImpegnataKw: z.number().optional(),
+    usiGas: z.array(z.enum(["cottura", "riscaldamento", "acqua_calda"])).optional(),
+
     residenziale: z.enum(["si", "no"]).optional(),
   }).superRefine((data, ctx) => {
     // IBAN required se selectedOffer?.requiresIban === true
@@ -161,6 +165,28 @@ const createValidationSchema = (selectedOffer?: Offer) => {
         message: "Campo residenziale obbligatorio",
         path: ["residenziale"],
       });
+    }
+
+    // Potenza impegnata required per luce
+    if (selectedOffer?.commodity === "electricity") {
+      if (!data.potenzaImpegnataKw || data.potenzaImpegnataKw <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Potenza impegnata obbligatoria e deve essere maggiore di 0",
+          path: ["potenzaImpegnataKw"],
+        });
+      }
+    }
+
+    // Usi gas required per gas
+    if (selectedOffer?.commodity === "gas") {
+      if (!data.usiGas || data.usiGas.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Seleziona almeno un uso del gas",
+          path: ["usiGas"],
+        });
+      }
     }
   });
 };
