@@ -1,15 +1,10 @@
 import { createWorker, PSM, OEM, Worker } from "tesseract.js";
 import * as pdfjsLib from "pdfjs-dist";
 
-// @ts-ignore - Disable external worker and use bundled version for reliability
-// This avoids CORS issues with external CDNs
-(pdfjsLib as any).GlobalWorkerOptions.workerSrc = false;
-
-// Alternative: Use the bundled worker from the node_modules
-// (pdfjsLib as any).GlobalWorkerOptions.workerSrc = new URL(
-//   'pdfjs-dist/build/pdf.worker.js',
-//   import.meta.url
-// ).toString();
+// @ts-ignore - Configure PDF.js worker with reliable CDN
+// Using jsdelivr which is more reliable than cloudflare for CORS
+(pdfjsLib as any).GlobalWorkerOptions.workerSrc =
+  'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.54/build/pdf.worker.min.js';
 
 let ocrWorker: Worker | null = null;
 
