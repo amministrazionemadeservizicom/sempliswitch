@@ -1,6 +1,15 @@
-import { detectDocType, parseFieldsByType, type ParsedFields } from './id-parsers';
-
-import { detectDocType, parseFieldsByType, type ParsedFields } from './id-parsers';
+// Types only import to avoid conflicts
+type ParsedFields = {
+  nome?: string;
+  cognome?: string;
+  dataNascita?: string;
+  luogoNascita?: string;
+  codiceFiscale?: string;
+  numeroDocumento?: string;
+  scadenza?: string;
+  iban?: string;
+  conf?: number;
+};
 
 const OCR_ENDPOINT = 'https://sempliswitch.it/.netlify/functions/ocr';
 
