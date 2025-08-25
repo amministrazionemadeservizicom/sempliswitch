@@ -1,6 +1,12 @@
 import express from "express";
 import cors from "cors";
+import fileUpload from "express-fileupload";
+import dotenv from "dotenv";
 import { handleDemo } from "./routes/demo";
+import { handleDocumentOCR, handleBillOCR } from "./routes/ocr";
+
+// Load environment variables
+dotenv.config();
 
 export function createServer() {
   const app = express();
@@ -9,6 +15,11 @@ export function createServer() {
   app.use(cors());
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+  app.use(fileUpload({
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max file size
+    abortOnLimit: true,
+    responseOnLimit: 'File size limit exceeded'
+  }));
 
   // Example API routes
   app.get("/api/ping", (_req, res) => {
@@ -16,6 +27,10 @@ export function createServer() {
   });
 
   app.get("/api/demo", handleDemo);
+
+  // OCR routes
+  app.post("/api/ocr/document", handleDocumentOCR);
+  app.post("/api/ocr/bill", handleBillOCR);
 
   return app;
 }

@@ -1,6 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { toast } from "sonner";
 import AppLayout from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,102 +11,34 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Upload,
   FileText,
   User,
-  Phone,
-  Mail,
-  CreditCard,
   Camera,
   CheckCircle,
   AlertTriangle,
-  X,
   Save,
   AlertCircle,
-  ExternalLink
 } from "lucide-react";
-import { extractTextFromFiles, terminateOcrWorker } from "@/utils/ocr";
-import { detectDocType, parseFieldsByType, DocType } from "@/utils/id-parsers";
-/**
- * ⚠️ Assicurati di configurare la variabile VITE_API_BASE_URL nel file .env per puntare al backend OCR!
- * Es: VITE_API_BASE_URL="https://backend.example.com/api"
- */
+// Rimosso: ora usiamo Netlify OCR
+import { processDocumentOCR, processBillOCR } from "@/utils/netlify-ocr";
+import { useCamera } from "@/hooks/useCamera";
 
-/** Converte una o più immagini (File) in un unico Blob PDF */
-async function imagesToSinglePdf(images: File[]): Promise<Blob> {
-  const pdfDoc = await PDFDocument.create();
+// Regex patterns
+const CF_REGEX = /^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/;
+const IBAN_IT_REGEX = /^IT\d{2}[A-Z]\d{3}\d{4}\d{12}$/;
 
-  for (const imgFile of images) {
-    const bytes = await imgFile.arrayBuffer();
-    const isPng = imgFile.type.includes('png');
-    const embedded = isPng
-      ? await pdfDoc.embedPng(bytes)
-      : await pdfDoc.embedJpg(bytes);
-
-    const { width, height } = embedded.size();
-    const page = pdfDoc.addPage([width, height]);
-    page.drawImage(embedded, { x: 0, y: 0, width, height });
-  }
-
-  const pdfBytes = await pdfDoc.save();
-  return new Blob([pdfBytes], { type: 'application/pdf' });
-}
-
-/** Normalizza una selezione eterogenea (PDF e/o immagini multiple) in UN file finale:
-  - se c'è 1 PDF e basta -> torna il PDF
-  - se ci sono più PDF -> (per ora) prendi il primo (comportamento semplice, NON mergiare PDF-PDF)
-  - se ci sono una o più immagini -> uniscile in un PDF
-  - se ci sono PDF+immagini -> priorità alle immagini unite (unico PDF) */
-async function normalizeToSinglePdf(files: FileList): Promise<File | null> {
-  if (!files || files.length === 0) return null;
-
-  const all = Array.from(files);
-  const pdfs = all.filter(f => f.type === 'application/pdf');
-  const images = all.filter(f => f.type.startsWith('image/'));
-
-  // Caso: solo immagini → crea un PDF unico
-  if (images.length > 0 && pdfs.length === 0) {
-    const mergedBlob = await imagesToSinglePdf(images);
-    return new File([mergedBlob], `scan_${Date.now()}.pdf`, { type: 'application/pdf' });
-  }
-
-  // Caso: solo PDF → prendi il primo (comportamento semplice)
-  if (pdfs.length > 0 && images.length === 0) {
-    return pdfs[0];
-  }
-
-  // Caso: PDF + immagini → usa il PDF creato dalle immagini (di solito è lo scenario "scansioni")
-  if (images.length > 0 && pdfs.length > 0) {
-    const mergedBlob = await imagesToSinglePdf(images);
-    return new File([mergedBlob], `scan_${Date.now()}.pdf`, { type: 'application/pdf' });
-  }
-
-  return null;
-}
-
-/** Unisce due PDF in un unico File PDF */
-async function mergePdfFiles(pdfA: File, pdfB: File): Promise<File> {
-  const aBytes = await pdfA.arrayBuffer();
-  const bBytes = await pdfB.arrayBuffer();
-  const aDoc = await PDFDocument.load(aBytes);
-  const bDoc = await PDFDocument.load(bBytes);
-  const merged = await PDFDocument.create();
-  const aPages = await merged.copyPages(aDoc, aDoc.getPageIndices());
-  aPages.forEach(p => merged.addPage(p));
-  const bPages = await merged.copyPages(bDoc, bDoc.getPageIndices());
-  bPages.forEach(p => merged.addPage(p));
-  const mergedBytes = await merged.save();
-  return new File([mergedBytes], `merged_${Date.now()}.pdf`, { type: 'application/pdf' });
-}
-
-/** Normalizza dei nuovi file in un PDF e lo unisce al documento esistente */
-async function appendFilesToExistingPdf(existing: File, files: FileList): Promise<File | null> {
-  const newPdf = await normalizeToSinglePdf(files);
-  if (!newPdf) return null;
-  return await mergePdfFiles(existing, newPdf);
-}
-
+// Types
 interface Offer {
   id: string;
   name: string;
@@ -111,840 +46,624 @@ interface Offer {
   serviceType: string;
   customerType: string;
   price: string;
+  commodity?: "electricity" | "gas";
+  segment?: "residential" | "business";
+  requiresIban?: boolean;
 }
 
-interface CustomerData {
-  nome: string;
-  cognome: string;
-  cf: string;
-  cellulare: string;
-  email: string;
-  iban: string;
-}
+// Zod schema with conditional validations
+const createValidationSchema = (selectedOffer?: Offer) => {
+  return z.object({
+    // Dati cliente
+    nome: z.string().min(1, "Nome obbligatorio"),
+    cognome: z.string().min(1, "Cognome obbligatorio"),
+    codiceFiscale: z.string().regex(CF_REGEX, "Codice fiscale non valido"),
+    cellulare: z.string().min(7, "Cellulare obbligatorio"),
+    email: z.string().email("Email non valida"),
+    iban: z.string().optional(),
+    
+    // Documento
+    docTipo: z.enum(["CARTA_IDENTITA", "PATENTE", "PASSAPORTO"]),
+    docRilasciatoDa: z.enum(["Comune", "MC", "MCTC", "MIT UCO", "Questura"]),
+    docNumero: z.string().optional(),
+    docRilascio: z.string().min(1, "Data di rilascio obbligatoria"),
+    docScadenza: z.string().min(1, "Data di scadenza obbligatoria"),
+    
+    // Indirizzi
+    resVia: z.string().min(1, "Via residenza obbligatoria"),
+    resCivico: z.string().min(1, "Civico residenza obbligatorio"),
+    resCitta: z.string().min(1, "Città residenza obbligatoria"),
+    resCap: z.string().min(4, "CAP residenza obbligatorio"),
+    
+    fornUguale: z.boolean().optional(),
+    fornVia: z.string().optional(),
+    fornCivico: z.string().optional(),
+    fornCitta: z.string().optional(),
+    fornCap: z.string().optional(),
+    
+    // POD/PDR condizionale
+    pod: z.string().optional(),
+    pdr: z.string().optional(),
 
-interface DocumentData {
-  nome: string;
-  cognome: string;
-  cf: string;
-  numeroDocumento: string;
-  dataRilascio: string;
-  dataScadenza: string;
-}
+    // Dati tecnici
+    potenzaImpegnataKw: z.number().optional(),
+    usiGas: z.array(z.enum(["cottura", "riscaldamento", "acqua_calda"])).optional(),
 
-interface InvoiceData {
-  pod: string;
-  indirizzoFornitura: string;
-  indirizzoFatturazione: string;
-  kwImpegnati: string;
-  tensione: string;
-}
+    residenziale: z.enum(["si", "no"]).optional(),
+  }).superRefine((data, ctx) => {
+    // IBAN required se selectedOffer?.requiresIban === true
+    if (selectedOffer?.requiresIban && !data.iban) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "IBAN obbligatorio per questa offerta",
+        path: ["iban"],
+      });
+    }
+    
+    // Validate IBAN format if provided
+    if (data.iban && !IBAN_IT_REGEX.test(data.iban.replace(/\s+/g, ""))) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Formato IBAN non valido",
+        path: ["iban"],
+      });
+    }
+    
+    // POD required se commodity === "electricity"
+    if (selectedOffer?.commodity === "electricity" && !data.pod) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "POD obbligatorio per offerte luce",
+        path: ["pod"],
+      });
+    }
+    
+    // PDR required se commodity === "gas"
+    if (selectedOffer?.commodity === "gas" && !data.pdr) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "PDR obbligatorio per offerte gas",
+        path: ["pdr"],
+      });
+    }
+    
+    // Fornitura fields required se fornUguale !== true
+    if (!data.fornUguale) {
+      if (!data.fornVia) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Via fornitura obbligatoria",
+          path: ["fornVia"],
+        });
+      }
+      if (!data.fornCivico) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Civico fornitura obbligatorio",
+          path: ["fornCivico"],
+        });
+      }
+      if (!data.fornCitta) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Città fornitura obbligatoria",
+          path: ["fornCitta"],
+        });
+      }
+      if (!data.fornCap) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "CAP fornitura obbligatorio",
+          path: ["fornCap"],
+        });
+      }
+    }
+    
+    // Residenziale required se segment === "residential"
+    if (selectedOffer?.segment === "residential" && !data.residenziale) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Campo residenziale obbligatorio",
+        path: ["residenziale"],
+      });
+    }
 
-interface ContractData {
-  cliente: CustomerData;
-  documento: string;
-  offerte: Array<{
-    id_offerta: string;
-    fattura: string;
-    dati_fattura: InvoiceData;
-  }>;
-}
+    // Potenza impegnata required per luce
+    if (selectedOffer?.commodity === "electricity") {
+      if (!data.potenzaImpegnataKw || data.potenzaImpegnataKw <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Potenza impegnata obbligatoria e deve essere maggiore di 0",
+          path: ["potenzaImpegnataKw"],
+        });
+      }
+    }
 
-function CustomCard(
-  { children, className = "" }: { children: React.ReactNode; className?: string }
-) {
-  return (
-    <div
-      className={`bg-gray-50 rounded-2xl shadow-sm border border-gray-100 ${className}`}
-      style={{
-        backgroundColor: '#FAFAFA',
-        boxShadow: '0px 2px 6px rgba(0,0,0,0.1)',
-        borderRadius: '16px'
-      }}
-    >
-      {children}
-    </div>
-  );
+    // Usi gas required per gas
+    if (selectedOffer?.commodity === "gas") {
+      if (!data.usiGas || data.usiGas.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Seleziona almeno un uso del gas",
+          path: ["usiGas"],
+        });
+      }
+    }
+  });
+};
+
+// Bill parsing function
+function parseBillData(text: string) {
+  const t = text.replace(/\s+/g, " ").toUpperCase();
+  
+  const addr = (label: string) => {
+    const m = t.match(new RegExp(label + "[:\\s]+([A-ZÀ-Ù' .-]+)\\s+(\\d+)", "i"));
+    return m ? { via: m[1].trim(), civico: m[2] } : undefined;
+  };
+  
+  const capCitta = () => {
+    const m = t.match(/\b(\d{5})\b[^A-Z0-9]{0,10}([A-ZÀ-Ù' -]{2,})/i);
+    return m ? { cap: m[1], citta: m[2].trim() } : undefined;
+  };
+  
+  const pod = t.match(/\bPOD\s*([A-Z0-9]{14,})\b/i)?.[1];
+  const pdr = t.match(/\bPDR\s*([0-9]{14})\b/i)?.[1];
+
+  // Estrazione potenza impegnata per luce
+  const potenzaMatch = t.match(/POTENZA\s+(IMPEGNATA|CONTRATTUALE)[^0-9]{0,10}(\d+[.,]?\d*)\s*KW/i);
+  const potenzaImpegnata = potenzaMatch ? parseFloat(potenzaMatch[2].replace(',', '.')) : undefined;
+
+  return { addr, capCitta, pod, pdr, potenzaImpegnata };
 }
 
 export default function CompileContract() {
   const navigate = useNavigate();
   const [selectedOffers, setSelectedOffers] = useState<Offer[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
-  
-  const [customerData, setCustomerData] = useState<CustomerData>({
-    nome: "",
-    cognome: "",
-    cf: "",
-    cellulare: "",
-    email: "",
-    iban: ""
-  });
-
-  const [documentData, setDocumentData] = useState<DocumentData>({
-    nome: "",
-    cognome: "",
-    cf: "",
-    numeroDocumento: "",
-    dataRilascio: "",
-    dataScadenza: ""
-  });
-
-  const [invoiceData, setInvoiceData] = useState<Record<string, InvoiceData>>({});
-  const [documentUploaded, setDocumentUploaded] = useState(false);
-  const [invoicesUploaded, setInvoicesUploaded] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
-  const [errors, setErrors] = useState<string[]>([]);
-  const [uploadedFiles, setUploadedFiles] = useState<{
-    document?: File;
-    invoices: Record<string, File>;
-  }>({ invoices: {} });
-  const [documentPreviewUrl, setDocumentPreviewUrl] = useState<string | null>(null);
-  const [invoicePreviewUrls, setInvoicePreviewUrls] = useState<Record<string, string>>({});
-  const apiBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL || "";
-  const isOcrConfigured = Boolean(apiBaseUrl);
-  const documentInputRef = useRef<HTMLInputElement>(null);
-  const documentAppendInputRef = useRef<HTMLInputElement>(null);
-
-  // OCR states
-  const [ocrRunning, setOcrRunning] = useState(false);
-  const [ocrText, setOcrText] = useState<string>("");
-  const [ocrPreviews, setOcrPreviews] = useState<string[]>([]);
-  const [docType, setDocType] = useState<DocType>("UNKNOWN");
-
-  // New OCR states for real client-side OCR
-  const [docPreviews, setDocPreviews] = useState<string[]>([]);
+  
+  // Document upload states
+  const [documentUploaded, setDocumentUploaded] = useState(false);
+  const [billUploaded, setBillUploaded] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
-  const [ocrError, setOcrError] = useState<string | null>(null);
+  const [docPreviews, setDocPreviews] = useState<string[]>([]);
+  const [billPreviews, setBillPreviews] = useState<string[]>([]);
+  const [ocrSource, setOcrSource] = useState<{ doc?: 'google' | 'tesseract' | 'netlify'; bill?: 'google' | 'tesseract' | 'netlify' }>({});
 
-  // Document type selector
-  type DocTypeLocal = "ci_nuova" | "ci_vecchia" | "patente" | "passaporto";
-  const [selectedDocType, setSelectedDocType] = useState<DocTypeLocal>("ci_nuova");
+  // Camera hook for mobile photo capture
+  const { isMobile, isCapturing, capturePhoto, error: cameraError, clearError } = useCamera();
 
-  // Cleanup degli ObjectURL e OCR worker
+  const selectedOffer = selectedOffers[0]; // Use first offer for validation logic
+  
+  const form = useForm({
+    resolver: zodResolver(createValidationSchema(selectedOffer)),
+    defaultValues: {
+      nome: "",
+      cognome: "",
+      codiceFiscale: "",
+      cellulare: "",
+      email: "",
+      iban: "",
+      docTipo: "CARTA_IDENTITA" as const,
+      docRilasciatoDa: "Comune" as const,
+      docNumero: "",
+      docRilascio: "",
+      docScadenza: "",
+      resVia: "",
+      resCivico: "",
+      resCitta: "",
+      resCap: "",
+      fornUguale: false,
+      fornVia: "",
+      fornCivico: "",
+      fornCitta: "",
+      fornCap: "",
+      pod: "",
+      pdr: "",
+      potenzaImpegnataKw: undefined,
+      usiGas: [] as ("cottura" | "riscaldamento" | "acqua_calda")[],
+      residenziale: "si" as const,
+    },
+  });
+  
+  const { register, handleSubmit, setValue, watch, formState: { errors } } = form;
+  const watchFornUguale = watch("fornUguale");
+  
+  // Cleanup
   useEffect(() => {
     return () => {
-      if (documentPreviewUrl) URL.revokeObjectURL(documentPreviewUrl);
-      Object.values(invoicePreviewUrls).forEach(u => URL.revokeObjectURL(u));
-      ocrPreviews.forEach(u => URL.revokeObjectURL(u));
-      terminateOcrWorker().catch(() => {});
-      // Rilascia gli URL locali
-      docPreviews.forEach((u) => URL.revokeObjectURL(u));
+      docPreviews.forEach(url => URL.revokeObjectURL(url));
+      billPreviews.forEach(url => URL.revokeObjectURL(url));
+      // OCR cleanup non più necessario con Netlify Functions
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Helper functions for OCR autofill
-  function capitalizeWords(s: string) {
-    return s.toLowerCase().replace(/\b\p{L}/gu, m => m.toUpperCase());
-  }
-
-  function normalizeDate(s: string) {
-    const [d, m, yRaw] = s.replace(/-/g,"/").replace(/\./g,"/").split("/");
-    const y = Number(yRaw) < 100 ? `19${yRaw}` : yRaw;
-    return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-  }
-
-  // Image preprocessing for better OCR quality
-  async function preprocessImage(file: File): Promise<Blob> {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.src = URL.createObjectURL(file);
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return resolve(file);
-
-        // Disegno immagine in B/N
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-        for (let i = 0; i < data.length; i += 4) {
-          const avg = (data[i] + data[i+1] + data[i+2]) / 3;
-          const bw = avg > 140 ? 255 : 0;  // threshold
-          data[i] = data[i+1] = data[i+2] = bw;
-        }
-        ctx.putImageData(imageData, 0, 0);
-
-        canvas.toBlob((blob) => {
-          if (blob) resolve(blob);
-          else resolve(file);
-        }, "image/png");
-      };
-    });
-  }
-
-  // Advanced regex patterns and parsing
-  function normalizeText(s: string) {
-    return s.replace(/\s+/g, " ").trim();
-  }
-
-  const RX_DATE = /\b(\d{2}\/\d{2}\/\d{4})\b/;
-  const RX_DATE_ALT = /\b(\d{4}-\d{2}-\d{2})\b/;
-  const RX_CF = /\b([A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z])\b/i;
-
-  // Numeri documento
-  const RX_CI_NUOVA_NUM = /\b([A-Z0-9]{9})\b/;
-  const RX_CI_VECCHIA_NUM = /\b(\d{5,8}[A-Z]{0,2})\b/;
-  const RX_PATENTE_NUM = /\b([A-Z]{1,2}\d{6,8})\b/;
-  const RX_PASSAPORTO_NUM = /\b([A-Z]{1,2}\d{6,8}|[A-Z0-9]{9})\b/;
-
-  // Etichette comuni
-  const RX_ENTE = /\b(Rilasciata da|Emessa da|Autorità|Comune|Questura)\s*[:\-]?\s*([A-ZÀ-Ù' \-]+)/i;
-  const RX_RILASCIO = /\b(Data di rilascio|Rilasciata il|Emessa il)\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})/i;
-  const RX_SCADENZA = /\b(Data di scadenza|Scadenza)\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})/i;
-
-  // Extra: nascita
-  const RX_NASCITA = /\b(Nato a|Luogo di nascita)\s*[:\-]?\s*([A-ZÀ-Ù' \-]+)\s+il\s*(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})/i;
-
-  function toIso(d: string) {
-    if (/\d{2}\/\d{2}\/\d{4}/.test(d)) {
-      const [gg, mm, aa] = d.split("/");
-      return `${aa}-${mm}-${gg}`;
+  }, [docPreviews, billPreviews]);
+  
+  // Copy residence to supply address when checkbox is checked
+  useEffect(() => {
+    if (watchFornUguale) {
+      setValue("fornVia", watch("resVia"));
+      setValue("fornCivico", watch("resCivico"));
+      setValue("fornCitta", watch("resCitta"));
+      setValue("fornCap", watch("resCap"));
     }
-    if (/\d{4}-\d{2}-\d{2}/.test(d)) return d;
-    return "";
-  }
-
-  function parseNameSurname(txt: string) {
-    let name = "", surname = "";
-    const nm1 = txt.match(/Cognome\s*[:\-]?\s*([A-ZÀ-Ù' -]+)\s+Nome\s*[:\-]?\s*([A-ZÀ-Ù' -]+)/i);
-    const nm2 = txt.match(/Nome\s*[:\-]?\s*([A-ZÀ-Ù' -]+)\s+Cognome\s*[:\-]?\s*([A-ZÀ-Ù' -]+)/i);
-    if (nm1) { surname = nm1[1].trim(); name = nm1[2].trim(); }
-    else if (nm2) { name = nm2[1].trim(); surname = nm2[2].trim(); }
-    const cap = (s: string) => s.toLowerCase().replace(/\b([a-zà-ù'])/g, (m) => m.toUpperCase());
-    return { name: name ? cap(name) : "", surname: surname ? cap(surname) : "" };
-  }
-
-  type ParsedDoc = {
-    number?: string;
-    issueDate?: string;
-    expiryDate?: string;
-    authority?: string;
-    name?: string;
-    surname?: string;
-    cf?: string;
-    birthDate?: string;
-    birthPlace?: string;
-  };
-
-  function parseByDocType(docType: DocTypeLocal, raw: string): ParsedDoc {
-    const t = normalizeText(raw);
-    const parsed: ParsedDoc = {};
-
-    const { name, surname } = parseNameSurname(t);
-    if (name) parsed.name = name;
-    if (surname) parsed.surname = surname;
-
-    const cf = t.match(RX_CF);
-    if (cf) parsed.cf = cf[1].toUpperCase();
-
-    const ente = t.match(RX_ENTE); if (ente) parsed.authority = ente[2].trim();
-    const ril = t.match(RX_RILASCIO) || t.match(RX_DATE) || t.match(RX_DATE_ALT);
-    const sca = t.match(RX_SCADENZA);
-    if (ril) parsed.issueDate = toIso(ril[2] || ril[1]);
-    if (sca) parsed.expiryDate = toIso(sca[2] || sca[1]);
-
-    const nasc = t.match(RX_NASCITA);
-    if (nasc) {
-      parsed.birthPlace = nasc[2].trim();
-      parsed.birthDate = toIso(nasc[3]);
-    }
-
-    switch (docType) {
-      case "ci_nuova": { const m = t.match(RX_CI_NUOVA_NUM); if (m) parsed.number = m[1]; break; }
-      case "ci_vecchia": { const m = t.match(RX_CI_VECCHIA_NUM); if (m) parsed.number = m[1]; break; }
-      case "patente": { const m = t.match(RX_PATENTE_NUM); if (m) parsed.number = m[1]; break; }
-      case "passaporto": { const m = t.match(RX_PASSAPORTO_NUM); if (m) parsed.number = m[1]; break; }
-    }
-
-    return parsed;
-  }
-
-  // Enhanced OCR document files handler with preprocessing
-  async function handleDocumentFiles(files: FileList | null) {
-    if (!files || files.length === 0) return;
-    setOcrLoading(true);
-    setOcrError(null);
-    try {
-      // Preprocess images for better OCR quality
-      const preprocessedFiles = await Promise.all(Array.from(files).map(preprocessImage));
-      const { text, previews } = await extractTextFromFiles(preprocessedFiles as File[]);
-      setDocPreviews((prev) => [...prev, ...previews]);
-
-      // Advanced parsing using selected document type
-      const parsed = parseByDocType(selectedDocType, text);
-
-      // Update form fields with extracted data
-      if (parsed.name) {
-        setCustomerData((p) => ({ ...p, nome: parsed.name! }));
-        setDocumentData((p) => ({ ...p, nome: parsed.name! }));
-      }
-      if (parsed.surname) {
-        setCustomerData((p) => ({ ...p, cognome: parsed.surname! }));
-        setDocumentData((p) => ({ ...p, cognome: parsed.surname! }));
-      }
-      if (parsed.cf) {
-        setCustomerData((p) => ({ ...p, cf: parsed.cf! }));
-        setDocumentData((p) => ({ ...p, cf: parsed.cf! }));
-      }
-      if (parsed.number) {
-        setDocumentData((p) => ({ ...p, numeroDocumento: parsed.number! }));
-      }
-      if (parsed.issueDate) {
-        setDocumentData((p) => ({ ...p, dataRilascio: parsed.issueDate! }));
-      }
-      if (parsed.expiryDate) {
-        setDocumentData((p) => ({ ...p, dataScadenza: parsed.expiryDate! }));
-      }
-      // Note: authority, birthDate, birthPlace would need additional fields in DocumentData interface
-
-      console.log('Advanced OCR parsed data:', parsed);
-
-      // Mark document as uploaded
-      setDocumentUploaded(true);
-
-    } catch (err: any) {
-      console.error("OCR error:", err);
-      setOcrError("Impossibile leggere il documento. Riprova con una foto più nitida.");
-    } finally {
-      setOcrLoading(false);
-    }
-  }
-
-  function autofillFromOcr(text: string) {
-    const norm = text.replace(/\s+/g, " ").trim();
-
-    const cf = norm.match(/\b([A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z])\b/i)?.[1];
-    if (cf) {
-      setCustomerData(prev => ({ ...prev, cf: cf.toUpperCase() }));
-      setDocumentData(prev => ({ ...prev, cf: cf.toUpperCase() }));
-    }
-
-    const iban = norm.match(/\b([A-Z]{2}\d{2}[A-Z0-9]{11,30})\b/i)?.[1];
-    if (iban) {
-      setCustomerData(prev => ({ ...prev, iban: iban.replace(/\s/g, "").toUpperCase() }));
-    }
-
-    const nome = norm.match(/(?:Nome|Name)[:\s]+([A-ZÀ-Ù' -]+)/i)?.[1]?.trim();
-    const cognome = norm.match(/(?:Cognome|Surname)[:\s]+([A-ZÀ-Ù' -]+)/i)?.[1]?.trim();
-    if (nome) {
-      const formattedNome = capitalizeWords(nome);
-      setCustomerData(prev => ({ ...prev, nome: formattedNome }));
-      setDocumentData(prev => ({ ...prev, nome: formattedNome }));
-    }
-    if (cognome) {
-      const formattedCognome = capitalizeWords(cognome);
-      setCustomerData(prev => ({ ...prev, cognome: formattedCognome }));
-      setDocumentData(prev => ({ ...prev, cognome: formattedCognome }));
-    }
-
-    const numeroDoc = norm.match(/(?:Numero|Document)[:\s]+([A-Z0-9]+)/i)?.[1]?.trim();
-    if (numeroDoc) {
-      setDocumentData(prev => ({ ...prev, numeroDocumento: numeroDoc }));
-    }
-
-    const dataRilascio = norm.match(/(?:Rilasciato|Issued)[:\s]+(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/i)?.[1];
-    if (dataRilascio) {
-      setDocumentData(prev => ({ ...prev, dataRilascio: normalizeDate(dataRilascio) }));
-    }
-
-    const dataScadenza = norm.match(/(?:Scadenza|Expires)[:\s]+(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/i)?.[1];
-    if (dataScadenza) {
-      setDocumentData(prev => ({ ...prev, dataScadenza: normalizeDate(dataScadenza) }));
-    }
-  }
-
-  // OCR-enabled document upload handler
-  async function handleIdUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files ? Array.from(e.target.files) : [];
-    if (!files.length) return;
-
-    setOcrRunning(true);
-    try {
-      const { text, previews } = await extractTextFromFiles(files);
-      setOcrText(text);
-
-      // Clean up old previews
-      ocrPreviews.forEach(u => URL.revokeObjectURL(u));
-      setOcrPreviews(previews);
-
-      // Smart document type detection and parsing
-      const detected = detectDocType(text);
-      setDocType(detected);
-      const parsed = parseFieldsByType(detected, text);
-
-      // Map parsed fields to form state (adapting setValue calls to current state management)
-      if (parsed.nome) {
-        setCustomerData(prev => ({ ...prev, nome: parsed.nome! }));
-        setDocumentData(prev => ({ ...prev, nome: parsed.nome! }));
-      }
-      if (parsed.cognome) {
-        setCustomerData(prev => ({ ...prev, cognome: parsed.cognome! }));
-        setDocumentData(prev => ({ ...prev, cognome: parsed.cognome! }));
-      }
-      if (parsed.codiceFiscale) {
-        setCustomerData(prev => ({ ...prev, cf: parsed.codiceFiscale! }));
-        setDocumentData(prev => ({ ...prev, cf: parsed.codiceFiscale! }));
-      }
-      if (parsed.iban) {
-        setCustomerData(prev => ({ ...prev, iban: parsed.iban! }));
-      }
-      if (parsed.numeroDocumento) {
-        setDocumentData(prev => ({ ...prev, numeroDocumento: parsed.numeroDocumento! }));
-      }
-      if (parsed.scadenza) {
-        setDocumentData(prev => ({ ...prev, dataScadenza: parsed.scadenza! }));
-      }
-      if (parsed.dataNascita) {
-        // Add birth date to document data if we had that field
-        console.log('Data nascita rilevata:', parsed.dataNascita);
-      }
-
-      // Fallback to generic OCR parsing for any missed fields
-      autofillFromOcr(text);
-
-      // Also normalize files to single PDF for upload
-      const finalFile = await normalizeToSinglePdf(e.target.files!);
-      if (finalFile) {
-        setUploadedFiles(prev => ({ ...prev, document: finalFile as File }));
-        setDocumentUploaded(true);
-      }
-    } catch (err) {
-      console.error("OCR error", err);
-      setErrors(prev => [...prev, "Errore nell'elaborazione OCR del documento."]);
-    } finally {
-      setOcrRunning(false);
-      e.currentTarget.value = '';
-    }
-  }
-
-  const handleDocumentAppend = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!uploadedFiles.document) return; // safety
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-    try {
-      setIsProcessing(true);
-      const merged = await appendFilesToExistingPdf(uploadedFiles.document, files);
-      if (!merged) return;
-      // ricalcola l'OCR sul PDF completo per popolare nuovamente i campi
-      const extracted = await processDocumentOCR(merged);
-      setDocumentData(extracted);
-      setCustomerData(prev => ({ ...prev, nome: extracted.nome, cognome: extracted.cognome, cf: extracted.cf }));
-      setUploadedFiles(prev => ({ ...prev, document: merged }));
-      const prevUrl = documentPreviewUrl;
-      const newUrl = URL.createObjectURL(merged);
-      if (prevUrl) URL.revokeObjectURL(prevUrl);
-      setDocumentPreviewUrl(newUrl);
-    } catch (e) {
-      console.error('Append documento fallito:', e);
-      setErrors(prev => [...prev, "Errore nell'aggiunta pagine al documento."]);
-    } finally {
-      setIsProcessing(false);
-      event.currentTarget.value = '';
-    }
-  };
-
-  // Load offers from localStorage and check if should redirect
+  }, [watchFornUguale, watch, setValue]);
+  
+  // Load offers from localStorage
   useEffect(() => {
     const loadOffers = () => {
       try {
-        // First check for "selectedOffer" key
         const selectedOffer = localStorage.getItem("selectedOffer");
         if (selectedOffer) {
           const parsed = JSON.parse(selectedOffer);
-          // Transform into array with single element
           const offerArray = Array.isArray(parsed) ? parsed : [parsed];
           setSelectedOffers(offerArray);
-          console.log("[CompileContract] trovata chiave selectedOffer:", offerArray);
           return;
         }
-
-        // 🔎 1) Prova più chiavi comuni
+        
         const possibleKeys = ["selectedOffers", "selected_offers", "cart", "carrello"];
         let raw: string | null = null;
         for (const k of possibleKeys) {
           const v = localStorage.getItem(k);
           if (v) {
             raw = v;
-            console.log("[CompileContract] trovata chiave localStorage:", k);
             break;
           }
         }
-
+        
         if (!raw) {
-          console.warn("[CompileContract] Nessuna chiave trovata in localStorage (selectedOffers/cart).");
           setSelectedOffers([]);
           return;
         }
-
+        
         let parsed = JSON.parse(raw);
-
-        // 2) Se qualcuno ha salvato un singolo oggetto invece di un array
         if (!Array.isArray(parsed)) {
           parsed = [parsed];
         }
-
-        // 3) Mappatura robusta dei campi più comuni
+        
         const mapped: Offer[] = parsed
           .map((offer: any) => {
             if (!offer) return null;
+            
+            const id = offer.id ?? offer.offerId ?? offer.uid ?? offer._id ?? `${offer.brand || offer.gestore || "offer"}-${offer.nome || offer.name || Date.now()}`;
+            const name = offer.name ?? offer.nome ?? offer.titolo ?? "Offerta";
+            const brand = offer.brand ?? offer.gestore ?? offer.marca ?? "Gestore";
+            const serviceType = offer.serviceType ?? offer.tipo ?? offer.tipologia ?? offer.supplyType ?? "servizio";
+            const customerType = offer.customerType ?? offer.tipoCliente ?? offer.segmento ?? "residenziale";
+            const price = offer.price ?? offer.prezzo ?? offer.costo ?? "";
+            
+            // Inferire commodity dal serviceType se non presente
+            let commodity = offer.commodity;
+            if (!commodity) {
+              const service = serviceType.toLowerCase();
+              if (service.includes("luce") || service.includes("electric")) {
+                commodity = "electricity";
+              } else if (service.includes("gas")) {
+                commodity = "gas";
+              }
+            }
 
-            const id =
-              offer.id ?? offer.offerId ?? offer.uid ?? offer._id ?? `${offer.brand || offer.gestore || "offer"}-${offer.nome || offer.name || Date.now()}`;
-
-            const name =
-              offer.name ?? offer.nome ?? offer.titolo ?? "Offerta";
-
-            const brand =
-              offer.brand ?? offer.gestore ?? offer.marca ?? "Gestore";
-
-            const serviceType =
-              offer.serviceType ?? offer.tipo ?? offer.tipologia ?? offer.supplyType ?? "servizio";
-
-            const customerType =
-              offer.customerType ?? offer.tipoCliente ?? offer.segmento ?? "residenziale";
-
-            const price =
-              offer.price ?? offer.prezzo ?? offer.costo ?? "";
-
-            return { id, name, brand, serviceType, customerType, price } as Offer;
+            return {
+              id, name, brand, serviceType, customerType, price,
+              commodity: commodity,
+              segment: offer.segment,
+              requiresIban: offer.requiresIban
+            } as Offer;
           })
           .filter(Boolean);
-
-        console.log("[CompileContract] Offerte mappate:", mapped);
-
+        
         setSelectedOffers(mapped);
       } catch (error) {
-        console.error("[CompileContract] Errore nel parse/mapping localStorage:", error);
+        console.error("Error loading offers:", error);
         setSelectedOffers([]);
       } finally {
         setIsLoaded(true);
       }
     };
-
+    
     loadOffers();
   }, []);
-
-  // Check if user has selected offers, redirect if not (after loading)
+  
+  // Redirect if no offers
   useEffect(() => {
     if (isLoaded && selectedOffers.length === 0) {
       navigate("/offers");
     }
   }, [selectedOffers, navigate, isLoaded]);
-
-  /** Invoca il backend OCR caricando il file come FormData.
-   *  Endpoint attesi:
-   *   - POST `${import.meta.env.VITE_API_BASE_URL}/ocr/document` -> DocumentData
-   *   - POST `${import.meta.env.VITE_API_BASE_URL}/ocr/invoice`  -> InvoiceData
-   */
-  async function callOcrApi<T>(path: "/ocr/document" | "/ocr/invoice", file: File): Promise<T> {
-    const base = import.meta.env.VITE_API_BASE_URL || "";
-    if (!base) {
-      throw new Error("OCR non configurato (manca VITE_API_BASE_URL).");
-    }
-    const url = `${base}${path}`;
-    const form = new FormData();
-    form.append("file", file, file.name);
-
-    const res = await fetch(url, {
-      method: "POST",
-      body: form,
-    });
-
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(`OCR API error ${res.status}: ${txt}`);
-    }
-    return (await res.json()) as T;
-  }
-
-  // Sostituisce il MOCK: usa l'endpoint /ocr/document
-  const processDocumentOCR = async (file: File): Promise<DocumentData> => {
-    try {
-      // Invia SEMPRE il PDF già normalizzato/mergiato
-      const data = await callOcrApi<DocumentData>("/ocr/document", file);
-
-      // Normalizzazione/valori di sicurezza: evita undefined
-      return {
-        nome: data?.nome || "",
-        cognome: data?.cognome || "",
-        cf: data?.cf || "",
-        numeroDocumento: data?.numeroDocumento || "",
-        dataRilascio: data?.dataRilascio || "",
-        dataScadenza: data?.dataScadenza || "",
-      };
-    } catch (err: any) {
-      console.error("OCR documento fallito:", err);
-      setErrors(prev => [...prev, err?.message || "OCR documento non disponibile. Compila i campi a mano."]);
-      return {
-        nome: "",
-        cognome: "",
-        cf: "",
-        numeroDocumento: "",
-        dataRilascio: "",
-        dataScadenza: "",
-      };
-    }
-  };
-
-  // Sostituisce il MOCK: usa l'endpoint /ocr/invoice
-  const processInvoiceOCR = async (file: File): Promise<InvoiceData> => {
-    try {
-      const data = await callOcrApi<InvoiceData>("/ocr/invoice", file);
-      return {
-        pod: data?.pod || "",
-        indirizzoFornitura: data?.indirizzoFornitura || "",
-        indirizzoFatturazione: data?.indirizzoFatturazione || "",
-        kwImpegnati: data?.kwImpegnati || "",
-        tensione: data?.tensione || "",
-      };
-    } catch (err: any) {
-      console.error("OCR fattura fallito:", err);
-      setErrors(prev => [...prev, err?.message || "OCR fattura non disponibile. Compila i campi a mano."]);
-      return {
-        pod: "",
-        indirizzoFornitura: "",
-        indirizzoFatturazione: "",
-        kwImpegnati: "",
-        tensione: "",
-      };
-    }
-  };
-
-  const handleDocumentUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
+  
+  // Handle document upload with OCR (Netlify Functions)
+  const handleDocumentUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
+    setOcrLoading(true);
     try {
-      // Normalizza la selezione a UN solo file PDF finale (merge se necess.)
-      const finalFile = await normalizeToSinglePdf(files);
-      if (!finalFile) return;
+      const { text, parsed, previews } = await processDocumentOCR(Array.from(files));
+      setDocPreviews(prev => [...prev, ...previews]);
 
-      // Valida dimensione (max 10MB per sicurezza, puoi tenere 5MB se vuoi)
-      const MAX = 10 * 1024 * 1024;
-      if (finalFile.size > MAX) {
-        setErrors(prev => [...prev, "File troppo grande. Massimo 10MB."]);
-        return;
+      // Debug: log extracted text
+      console.log("📄 Testo estratto OCR:", text);
+      console.log("📋 Dati parsificati:", parsed);
+
+      // Auto-fill form fields with debug
+      let filledFields = 0;
+      if (parsed.nome) {
+        setValue("nome", parsed.nome);
+        console.log("✅ Nome compilato:", parsed.nome);
+        filledFields++;
+      }
+      if (parsed.cognome) {
+        setValue("cognome", parsed.cognome);
+        console.log("✅ Cognome compilato:", parsed.cognome);
+        filledFields++;
+      }
+      if (parsed.codiceFiscale) {
+        setValue("codiceFiscale", parsed.codiceFiscale);
+        console.log("✅ Codice Fiscale compilato:", parsed.codiceFiscale);
+        filledFields++;
+      }
+      if (parsed.numeroDocumento) {
+        setValue("docNumero", parsed.numeroDocumento);
+        console.log("✅ Numero documento compilato:", parsed.numeroDocumento);
+        filledFields++;
+      }
+      if (parsed.scadenza) {
+        setValue("docScadenza", parsed.scadenza);
+        console.log("✅ Scadenza compilata:", parsed.scadenza);
+        filledFields++;
       }
 
-      // Esegui l'OCR mock come già fai oggi, passando il PDF finale
-      setIsProcessing(true);
-      const extractedData = await processDocumentOCR(finalFile as File);
+      console.log(`📊 Totale campi compilati: ${filledFields}/5`);
 
-      setDocumentData(extractedData);
-      setCustomerData(prev => ({
-        ...prev,
-        nome: extractedData.nome,
-        cognome: extractedData.cognome,
-        cf: extractedData.cf
-      }));
+      // Show success message
+      toast.success(`Documento elaborato con OCR. ${filledFields} campi compilati automaticamente.`);
 
-      const previewUrl = URL.createObjectURL(finalFile as File);
-      if (documentPreviewUrl) URL.revokeObjectURL(documentPreviewUrl);
-      setDocumentPreviewUrl(previewUrl);
-
-      // Salva il file finale per l'upload sicuro più avanti
-      setUploadedFiles(prev => ({ ...prev, document: finalFile as File }));
       setDocumentUploaded(true);
-    } catch (err) {
-      console.error("Errore upload documento:", err);
-      setErrors(prev => [...prev, "Errore nell'elaborazione del documento."]);
+      setOcrSource(prev => ({ ...prev, doc: 'netlify' }));
+
+    } catch (err: any) {
+      console.error("OCR error:", err);
+      toast.error(`Errore nell'elaborazione OCR del documento: ${err.message}. Compila i campi manualmente.`);
     } finally {
-      setIsProcessing(false);
-      // reset del value per permettere nuovo stesso file
-      event.currentTarget.value = "";
+      setOcrLoading(false);
     }
   };
 
-  const handleInvoiceUpload = async (event: React.ChangeEvent<HTMLInputElement>, offerId: string) => {
-    const files = event.target.files;
+  // Handle document photo capture (mobile only)
+  const handleDocumentCapture = async () => {
+    if (!isMobile) {
+      toast.error('Funzione disponibile solo su dispositivi mobili');
+      return;
+    }
+
+    clearError(); // Clear any previous camera errors
+
+    try {
+      const capturedFile = await capturePhoto();
+
+      if (capturedFile) {
+        console.log('📸 Foto catturata:', capturedFile.name);
+
+        // Process the captured photo like a regular upload
+        const fileList = {
+          0: capturedFile,
+          length: 1,
+          item: (index: number) => index === 0 ? capturedFile : null,
+          [Symbol.iterator]: function* () {
+            yield capturedFile;
+          }
+        } as FileList;
+
+        await handleDocumentUpload(fileList);
+      }
+    } catch (error) {
+      console.error('❌ Errore cattura foto:', error);
+      toast.error('Errore durante la cattura della foto');
+    }
+  };
+
+  // Handle bill upload with OCR (Netlify Functions)
+  const handleBillUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
+    setOcrLoading(true);
     try {
-      // Normalizza la selezione a UN PDF
-      const finalFile = await normalizeToSinglePdf(files);
-      if (!finalFile) return;
+      const { text, data, previews } = await processBillOCR(Array.from(files));
+      setBillPreviews(prev => [...prev, ...previews]);
 
-      const MAX = 10 * 1024 * 1024;
-      if (finalFile.size > MAX) {
-        setErrors(prev => [...prev, "File troppo grande. Massimo 10MB."]);
-        return;
-      }
+      console.log("📄 Testo fattura estratto:", text);
+      console.log("📋 Dati fattura parsificati:", data);
 
-      setIsProcessing(true);
+      let filledFields = 0;
 
-      // OCR mock come oggi
-      const extractedData = await processInvoiceOCR(finalFile as File);
-      setInvoiceData(prev => ({ ...prev, [offerId]: extractedData }));
-
-      const url = URL.createObjectURL(finalFile as File);
-      setInvoicePreviewUrls(prev => {
-        if (prev[offerId]) URL.revokeObjectURL(prev[offerId]);
-        return { ...prev, [offerId]: url };
-      });
-
-      // Salva file per upload sicuro
-      setUploadedFiles(prev => ({
-        ...prev,
-        invoices: { ...prev.invoices, [offerId]: finalFile as File }
-      }));
-
-      setInvoicesUploaded(new Set([...invoicesUploaded, offerId]));
-    } catch (err) {
-      console.error("Errore upload fattura:", err);
-      setErrors(prev => [...prev, "Errore nell'elaborazione della fattura."]);
-    } finally {
-      setIsProcessing(false);
-      event.currentTarget.value = "";
-    }
-  };
-
-  const updateCustomerData = (field: keyof CustomerData, value: string) => {
-    setCustomerData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const updateDocumentData = (field: keyof DocumentData, value: string) => {
-    setDocumentData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const updateInvoiceData = (offerId: string, field: keyof InvoiceData, value: string) => {
-    setInvoiceData(prev => ({
-      ...prev,
-      [offerId]: {
-        ...prev[offerId],
-        [field]: value
-      }
-    }));
-  };
-
-  const validateForm = (): boolean => {
-    const newErrors: string[] = [];
-    
-    // Check required customer fields
-    if (!customerData.nome) newErrors.push("Nome obbligatorio");
-    if (!customerData.cognome) newErrors.push("Cognome obbligatorio");
-    if (!customerData.cellulare) newErrors.push("Cellulare obbligatorio");
-    if (!customerData.email) newErrors.push("Email obbligatoria");
-    if (!customerData.iban) newErrors.push("IBAN obbligatorio");
-    
-    // Check document upload
-    if (!documentUploaded) newErrors.push("Documento d'identità obbligatorio");
-    
-    // Check invoice uploads
-    for (const offer of selectedOffers) {
-      if (!invoicesUploaded.has(offer.id)) {
-        newErrors.push(`Fattura obbligatoria per ${offer.name}`);
-      }
-    }
-    
-    setErrors(newErrors);
-    return newErrors.length === 0;
-  };
-
-  // Simulate secure file upload to cloud storage
-  const uploadToSecureStorage = async (file: File, type: 'document' | 'invoice', clientId: string): Promise<string> => {
-    // Simulate upload delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // In real implementation, this would upload to:
-    // - Firebase Storage
-    // - Supabase Storage
-    // - Google Drive via Make.com automation
-    // - AWS S3 with proper encryption
-
-    const timestamp = Date.now();
-    const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const secureUrl = `https://secure-storage.app/contracts/${clientId}/${type}/${timestamp}_${sanitizedFileName}`;
-
-    console.log(`File uploaded to secure storage: ${secureUrl}`);
-    return secureUrl;
-  };
-
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
-
-    setIsProcessing(true);
-
-    try {
-      // Upload document to secure storage
-      const documentUrl = uploadedFiles.document
-        ? await uploadToSecureStorage(uploadedFiles.document, 'document', customerData.cf)
-        : '';
-
-      // Upload invoices to secure storage
-      const invoiceUrls: Record<string, string> = {};
-      for (const offer of selectedOffers) {
-        if (uploadedFiles.invoices[offer.id]) {
-          invoiceUrls[offer.id] = await uploadToSecureStorage(
-            uploadedFiles.invoices[offer.id],
-            'invoice',
-            customerData.cf
-          );
+      // Extract residence address from parsed data
+      if (data.residenza) {
+        if (data.residenza.via) {
+          setValue("resVia", data.residenza.via);
+          filledFields++;
+        }
+        if (data.residenza.civico) {
+          setValue("resCivico", data.residenza.civico);
+          filledFields++;
+        }
+        if (data.residenza.cap) {
+          setValue("resCap", data.residenza.cap);
+          filledFields++;
+        }
+        if (data.residenza.citta) {
+          setValue("resCitta", data.residenza.citta);
+          filledFields++;
         }
       }
 
-      const contractData: ContractData = {
-        cliente: customerData,
-        documento: documentUrl,
-        offerte: selectedOffers.map(offer => ({
-          id_offerta: offer.id,
-          fattura: invoiceUrls[offer.id],
-          dati_fattura: invoiceData[offer.id] || {
-            pod: "",
-            indirizzoFornitura: "",
-            indirizzoFatturazione: "",
-            kwImpegnati: "",
-            tensione: ""
+      // Extract supply address from parsed data
+      if (data.fornitura) {
+        if (data.fornitura.via) {
+          setValue("fornVia", data.fornitura.via);
+          filledFields++;
+        }
+        if (data.fornitura.civico) {
+          setValue("fornCivico", data.fornitura.civico);
+          filledFields++;
+        }
+        if (data.fornitura.cap) {
+          setValue("fornCap", data.fornitura.cap);
+          filledFields++;
+        }
+        if (data.fornitura.citta) {
+          setValue("fornCitta", data.fornitura.citta);
+          filledFields++;
+        }
+      }
+
+      // Set POD/PDR based on commodity
+      if (selectedOffer?.commodity === "electricity" && data.pod) {
+        setValue("pod", data.pod);
+        filledFields++;
+      }
+      if (selectedOffer?.commodity === "gas" && data.pdr) {
+        setValue("pdr", data.pdr);
+        filledFields++;
+      }
+
+      // Set potenza impegnata for electricity
+      if (selectedOffer?.commodity === "electricity" && data.potenzaImpegnata) {
+        setValue("potenzaImpegnataKw", data.potenzaImpegnata);
+        filledFields++;
+      }
+
+      console.log(`📊 Totale campi fattura compilati: ${filledFields}`);
+
+      // Show success message
+      toast.success(`Fattura elaborata con Netlify OCR. ${filledFields} campi compilati automaticamente.`);
+
+      setBillUploaded(true);
+      setOcrSource(prev => ({ ...prev, bill: 'netlify' }));
+
+    } catch (err: any) {
+      console.error("Bill OCR error:", err);
+      toast.error("Errore nell'elaborazione della fattura. Compila i campi manualmente.");
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  // Handle bill photo capture (mobile only)
+  const handleBillCapture = async () => {
+    if (!isMobile) {
+      toast.error('Funzione disponibile solo su dispositivi mobili');
+      return;
+    }
+
+    clearError(); // Clear any previous camera errors
+
+    try {
+      const capturedFile = await capturePhoto();
+
+      if (capturedFile) {
+        console.log('📸 Foto fattura catturata:', capturedFile.name);
+
+        // Process the captured photo like a regular upload
+        const fileList = {
+          0: capturedFile,
+          length: 1,
+          item: (index: number) => index === 0 ? capturedFile : null,
+          [Symbol.iterator]: function* () {
+            yield capturedFile;
           }
-        }))
+        } as FileList;
+
+        await handleBillUpload(fileList);
+      }
+    } catch (error) {
+      console.error('❌ Errore cattura foto fattura:', error);
+      toast.error('Errore durante la cattura della foto della fattura');
+    }
+  };
+
+  // Form submission
+  const onSubmit = async (data: any) => {
+    if (!documentUploaded) {
+      toast.error("Documento d'identità obbligatorio");
+      return;
+    }
+    
+    setIsProcessing(true);
+    
+    try {
+      // Normalize data
+      const contractData = {
+        cliente: {
+          nome: data.nome,
+          cognome: data.cognome,
+          codiceFiscale: data.codiceFiscale,
+          cellulare: data.cellulare,
+          email: data.email,
+          iban: data.iban
+        },
+        documento: {
+          tipo: data.docTipo,
+          numero: data.docNumero,
+          rilasciatoDa: data.docRilasciatoDa,
+          dataRilascio: data.docRilascio,
+          dataScadenza: data.docScadenza
+        },
+        indirizzi: {
+          residenza: {
+            via: data.resVia,
+            civico: data.resCivico,
+            citta: data.resCitta,
+            cap: data.resCap
+          },
+          fornitura: data.fornUguale ? {
+            via: data.resVia,
+            civico: data.resCivico,
+            citta: data.resCitta,
+            cap: data.resCap
+          } : {
+            via: data.fornVia,
+            civico: data.fornCivico,
+            citta: data.fornCitta,
+            cap: data.fornCap
+          }
+        },
+        pod: data.pod,
+        pdr: data.pdr,
+        potenzaImpegnataKw: data.potenzaImpegnataKw,
+        usiGas: data.usiGas,
+        residenziale: data.residenziale,
+        offerte: selectedOffers
       };
-
-      // Save contract to database (simulate)
-      console.log("Contract data saved:", contractData);
-
-      // Save to localStorage for demo (in real app would be database)
+      
+      // Save to localStorage (in real app would be database)
       const existingContracts = JSON.parse(localStorage.getItem('contracts') || '[]');
       const newContract = {
         ...contractData,
         id: Date.now().toString(),
-        consulenteId: 'user1', // Current user ID
+        consulenteId: 'user1',
         stato: 'da_verificare',
         dataCreazione: new Date().toISOString(),
         ultimaModifica: new Date().toISOString()
       };
       existingContracts.push(newContract);
       localStorage.setItem('contracts', JSON.stringify(existingContracts));
-
-      // Reset cart
+      
+      // Clear cart
       localStorage.removeItem('selectedOffers');
       localStorage.removeItem('selectedOffer');
-
-      // Show success message
-      alert("✅ Contratto inviato con successo!");
-
-      // Navigate to contracts page
+      
+      toast.success("Contratto inviato con successo!");
       navigate("/contracts");
-
+      
     } catch (error) {
-      console.error("Error submitting contract:", error);
-      setErrors([...errors, "Errore nell'invio del contratto. Riprova."]);
+      console.error("Submit error:", error);
+      toast.error("Errore nell'invio del contratto. Riprova.");
     } finally {
       setIsProcessing(false);
     }
   };
-
-  // Don't render anything until data is loaded
-  if (!isLoaded) {
-    return null;
-  }
-
-  // If no offers after loading, useEffect will handle redirect
-  if (selectedOffers.length === 0) {
-    return null;
-  }
-
+  
+  if (!isLoaded) return null;
+  if (selectedOffers.length === 0) return null;
+  
   return (
     <AppLayout userRole="consulente">
       <div className="min-h-screen bg-white">
@@ -954,18 +673,9 @@ export default function CompileContract() {
             <h1 className="text-3xl font-bold text-gray-900">Compila Contratto</h1>
             <p className="text-gray-600">Inserisci i dati del cliente e carica i documenti necessari</p>
           </div>
-
-          {!isOcrConfigured && docPreviews.length === 0 && (
-            <Alert className="mb-6 border-amber-200 bg-amber-50">
-              <AlertCircle className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-700">
-                OCR esterno non configurato. L'OCR client-side è attivo per l'estrazione automatica dei dati dai documenti.
-              </AlertDescription>
-            </Alert>
-          )}
-
+          
           {/* Selected Offers Summary */}
-          <CustomCard className="mb-8">
+          <Card className="mb-8">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
@@ -975,393 +685,652 @@ export default function CompileContract() {
             <CardContent>
               <div className="space-y-3">
                 {selectedOffers.map(offer => (
-                  <div key={offer.id} className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                  <div key={offer.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
                     <div>
                       <div className="font-medium">{offer.name}</div>
                       <div className="text-sm text-gray-500">{offer.brand} - {offer.serviceType}</div>
+                      {offer.commodity && (
+                        <Badge variant="outline" className="mt-1">
+                          {offer.commodity === "electricity" ? "Luce" : "Gas"}
+                        </Badge>
+                      )}
+                      {!offer.commodity && (
+                        <Badge variant="secondary" className="mt-1">
+                          Commodity non specificata
+                        </Badge>
+                      )}
                     </div>
                     <Badge variant="outline">{offer.price}</Badge>
                   </div>
                 ))}
               </div>
             </CardContent>
-          </CustomCard>
+          </Card>
+          
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+            {/* 1. Documento d'identità */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Camera className="h-5 w-5" />
+                  Documento d'identità
+                </CardTitle>
+                <p className="text-sm text-gray-600">
+                  Carica il documento del cliente per compilazione automatica
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Document Type Radio */}
+                <div>
+                  <Label className="text-sm font-medium">Tipo documento</Label>
+                  <RadioGroup
+                    value={watch("docTipo")}
+                    onValueChange={(value) => setValue("docTipo", value as any)}
+                    className="flex flex-wrap gap-6 mt-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="CARTA_IDENTITA" id="ci" />
+                      <Label htmlFor="ci">Carta di identità</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="PATENTE" id="patente" />
+                      <Label htmlFor="patente">Patente</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="PASSAPORTO" id="passaporto" />
+                      <Label htmlFor="passaporto">Passaporto</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+                
+                {/* Upload Area */}
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    multiple
+                    onChange={(e) => handleDocumentUpload(e.target.files)}
+                    className="hidden"
+                    id="doc-upload"
+                  />
+                  <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <div className="space-y-2">
+                    <p className="text-gray-600">
+                      Carica fronte e retro del documento
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      PDF, JPG o PNG - Accetta più file
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2 mt-2 justify-center">
+                      <Button
+                        type="button"
+                        onClick={() => document.getElementById("doc-upload")?.click()}
+                        style={{ backgroundColor: '#F2C927', color: '#333' }}
+                        disabled={ocrLoading || isCapturing}
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Seleziona File
+                      </Button>
 
-          {/* Errors */}
-          {errors.length > 0 && (
-            <Alert className="mb-6 border-red-200 bg-red-50">
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-              <AlertDescription>
-                <ul className="list-disc list-inside space-y-1">
-                  {errors.map((error, index) => (
-                    <li key={index} className="text-red-600">{error}</li>
-                  ))}
-                </ul>
-              </AlertDescription>
-            </Alert>
-          )}
+                      {isMobile && (
+                        <Button
+                          type="button"
+                          onClick={handleDocumentCapture}
+                          variant="outline"
+                          disabled={ocrLoading || isCapturing}
+                          className="border-[#F2C927] text-[#333] hover:bg-[#F2C927] hover:text-[#333]"
+                        >
+                          <Camera className="h-4 w-4 mr-2" />
+                          {isCapturing ? 'Scattando...' : 'Scatta Foto'}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Loading State */}
+                {ocrLoading && (
+                  <Alert className="border-blue-200 bg-blue-50">
+                    <AlertCircle className="h-4 w-4 text-blue-600" />
+                    <AlertDescription className="text-blue-600">
+                      Estrazione dati in corso...
+                    </AlertDescription>
+                  </Alert>
+                )}
 
-          <div className="space-y-8">
-            {/* Customer Data */}
-            <CustomCard>
+                {/* Camera Error */}
+                {cameraError && (
+                  <Alert className="border-red-200 bg-red-50">
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                    <AlertDescription className="text-red-600">
+                      {cameraError}
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {/* Document Previews */}
+                {docPreviews.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {docPreviews.map((src, i) => (
+                      <div key={i} className="border rounded-lg overflow-hidden bg-white">
+                        <img src={src} alt={`doc-${i}`} className="w-full h-32 object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Success Message */}
+                {documentUploaded && (
+                  <Alert className="border-green-200 bg-green-50">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-600">
+                      Documento elaborato con successo. I campi sono stati compilati automaticamente.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+            
+            {/* 2. Dati Cliente */}
+            <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <User className="h-5 w-5" />
                   Dati Cliente
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="nome">Nome *</Label>
                     <Input
                       id="nome"
-                      value={customerData.nome}
-                      onChange={(e) => updateCustomerData('nome', e.target.value)}
+                      {...register("nome")}
                       placeholder="Nome del cliente"
-                      autoComplete="off"
                     />
+                    {errors.nome && (
+                      <p className="text-sm text-red-600 mt-1">{errors.nome.message}</p>
+                    )}
                   </div>
+                  
                   <div>
                     <Label htmlFor="cognome">Cognome *</Label>
                     <Input
                       id="cognome"
-                      value={customerData.cognome}
-                      onChange={(e) => updateCustomerData('cognome', e.target.value)}
+                      {...register("cognome")}
                       placeholder="Cognome del cliente"
-                      autoComplete="off"
                     />
+                    {errors.cognome && (
+                      <p className="text-sm text-red-600 mt-1">{errors.cognome.message}</p>
+                    )}
                   </div>
+                  
                   <div>
-                    <Label htmlFor="cf">Codice Fiscale</Label>
+                    <Label htmlFor="codiceFiscale">Codice Fiscale *</Label>
                     <Input
-                      id="cf"
-                      value={customerData.cf}
-                      onChange={(e) => updateCustomerData('cf', e.target.value)}
-                      placeholder="Codice fiscale"
-                      disabled={documentUploaded}
-                      autoComplete="off"
+                      id="codiceFiscale"
+                      {...register("codiceFiscale")}
+                      placeholder="RSSMRA80A01H501X"
+                      style={{ textTransform: 'uppercase' }}
                     />
+                    {errors.codiceFiscale && (
+                      <p className="text-sm text-red-600 mt-1">{errors.codiceFiscale.message}</p>
+                    )}
                   </div>
+                  
                   <div>
                     <Label htmlFor="cellulare">Cellulare *</Label>
                     <Input
                       id="cellulare"
-                      value={customerData.cellulare}
-                      onChange={(e) => updateCustomerData('cellulare', e.target.value)}
+                      {...register("cellulare")}
                       placeholder="+39 123 456 7890"
-                      autoComplete="off"
                     />
+                    {errors.cellulare && (
+                      <p className="text-sm text-red-600 mt-1">{errors.cellulare.message}</p>
+                    )}
                   </div>
+                  
                   <div>
                     <Label htmlFor="email">Email *</Label>
                     <Input
                       id="email"
                       type="email"
-                      value={customerData.email}
-                      onChange={(e) => updateCustomerData('email', e.target.value)}
+                      {...register("email")}
                       placeholder="cliente@email.com"
-                      autoComplete="off"
                     />
+                    {errors.email && (
+                      <p className="text-sm text-red-600 mt-1">{errors.email.message}</p>
+                    )}
                   </div>
+                  
                   <div>
-                    <Label htmlFor="iban">IBAN *</Label>
+                    <Label htmlFor="iban">
+                      IBAN {selectedOffer?.requiresIban ? "*" : ""}
+                    </Label>
                     <Input
                       id="iban"
-                      value={customerData.iban}
-                      onChange={(e) => updateCustomerData('iban', e.target.value)}
+                      {...register("iban")}
                       placeholder="IT60 X054 2811 1010 0000 0123 456"
-                      autoComplete="off"
+                      style={{ textTransform: 'uppercase' }}
                     />
+                    {errors.iban && (
+                      <p className="text-sm text-red-600 mt-1">{errors.iban.message}</p>
+                    )}
                   </div>
                 </div>
               </CardContent>
-            </CustomCard>
-
-            {/* Document Upload */}
-            <CustomCard>
+            </Card>
+            
+            {/* 3. Dettagli Documento */}
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Camera className="h-5 w-5" />
-                  Documento d'Identità
-                </CardTitle>
-                <p className="text-sm text-gray-600 mt-1">Puoi caricare PDF singoli o più foto; se ne carichi più di una le uniamo in un unico PDF.</p>
+                <CardTitle>Dettagli Documento</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  {/* Document Type Selector */}
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span className="text-sm text-gray-600">Tipo documento:</span>
-                    {(["ci_nuova","ci_vecchia","patente","passaporto"] as DocTypeLocal[]).map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setSelectedDocType(t)}
-                        className={`px-3 py-1 rounded-full border text-sm transition-colors ${
-                          selectedDocType === t ? "bg-black text-white" : "bg-white hover:bg-gray-50"
-                        }`}
-                      >
-                        {t.replace("_"," ")}
-                      </button>
-                    ))}
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="docRilasciatoDa">Rilasciato da *</Label>
+                    <Select
+                      value={watch("docRilasciatoDa")}
+                      onValueChange={(value) => setValue("docRilasciatoDa", value as any)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleziona ente" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Comune">Comune</SelectItem>
+                        <SelectItem value="MC">MC</SelectItem>
+                        <SelectItem value="MCTC">MCTC</SelectItem>
+                        <SelectItem value="MIT UCO">MIT UCO</SelectItem>
+                        <SelectItem value="Questura">Questura</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {errors.docRilasciatoDa && (
+                      <p className="text-sm text-red-600 mt-1">{errors.docRilasciatoDa.message}</p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="docNumero">Numero documento</Label>
+                    <Input
+                      id="docNumero"
+                      {...register("docNumero")}
+                      placeholder="Numero del documento"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="docRilascio">Data di rilascio *</Label>
+                    <Input
+                      id="docRilascio"
+                      type="date"
+                      {...register("docRilascio")}
+                    />
+                    {errors.docRilascio && (
+                      <p className="text-sm text-red-600 mt-1">{errors.docRilascio.message}</p>
+                    )}
                   </div>
 
-                  <div className="border-2 border-dashed rounded-xl p-5 text-center">
+                  <div>
+                    <Label htmlFor="docScadenza">Data di scadenza *</Label>
+                    <Input
+                      id="docScadenza"
+                      type="date"
+                      {...register("docScadenza")}
+                    />
+                    {errors.docScadenza && (
+                      <p className="text-sm text-red-600 mt-1">{errors.docScadenza.message}</p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* 4. Fattura */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Fattura</CardTitle>
+                <p className="text-sm text-gray-600">
+                  Carica una fattura recente per estrarre i dati di residenza e fornitura
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Upload Area */}
+                {!billUploaded && (
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                     <input
                       type="file"
                       accept="image/*,.pdf"
                       multiple
-                      onChange={(e) => handleDocumentFiles(e.target.files)}
+                      onChange={(e) => handleBillUpload(e.target.files)}
                       className="hidden"
-                      id="doc-upload"
+                      id="bill-upload"
                     />
-                    <label
-                      htmlFor="doc-upload"
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg"
-                      style={{ backgroundColor: '#F2C927', color: '#333', cursor: 'pointer' }}
-                    >
-                      Seleziona file (fronte/retro)
-                    </label>
+                    <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <div className="space-y-2">
+                      <p className="text-gray-600">Carica fattura del cliente</p>
+                      <p className="text-sm text-gray-500">PDF, JPG o PNG</p>
+                      <div className="flex flex-col sm:flex-row gap-2 mt-2 justify-center">
+                        <Button
+                          type="button"
+                          onClick={() => document.getElementById("bill-upload")?.click()}
+                          style={{ backgroundColor: '#F2C927', color: '#333' }}
+                          disabled={ocrLoading || isCapturing}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Seleziona File
+                        </Button>
 
-                    {ocrLoading && (
-                      <p className="mt-3 text-sm text-gray-600">Estrazione in corso…</p>
-                    )}
-                    {ocrError && (
-                      <p className="mt-3 text-sm text-red-600">{ocrError}</p>
-                    )}
-                    
-                    {/* Document Type Detection */}
-                    {docType !== "UNKNOWN" && (
-                      <div className="text-xs text-green-600 font-medium mt-2">✓ Documento riconosciuto: {docType}</div>
-                    )}
-                  </div>
-
-                  {docPreviews.length > 0 && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                      {docPreviews.map((src, i) => (
-                        <div key={i} className="border rounded-lg overflow-hidden bg-white">
-                          <img src={src} alt={`doc-${i}`} className="w-full h-36 object-cover" />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="flex gap-2">
-                    <label
-                      htmlFor="doc-upload"
-                      className="text-sm underline cursor-pointer"
-                    >
-                      Aggiungi un altro file
-                    </label>
-                  </div>
-                </div>
-                
-                {/* Document data fields - show when document is uploaded */}
-                {documentUploaded && (
-                  <div className="border border-green-200 bg-green-50 rounded-lg p-4 mt-4">
-                    <div className="flex items-center gap-2 text-green-700 mb-3">
-                      <CheckCircle className="h-5 w-5" />
-                      <span className="font-medium">Documento elaborato con OCR avanzato ({selectedDocType.replace("_", " ")})</span>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="doc-numero">Numero Documento</Label>
-                        <Input
-                          id="doc-numero"
-                          value={documentData.numeroDocumento}
-                          onChange={(e) => updateDocumentData('numeroDocumento', e.target.value)}
-                          autoComplete="off"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="doc-rilascio">Data Rilascio</Label>
-                        <Input
-                          id="doc-rilascio"
-                          value={documentData.dataRilascio}
-                          onChange={(e) => updateDocumentData('dataRilascio', e.target.value)}
-                          autoComplete="off"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="doc-scadenza">Data Scadenza</Label>
-                        <Input
-                          id="doc-scadenza"
-                          value={documentData.dataScadenza}
-                          onChange={(e) => updateDocumentData('dataScadenza', e.target.value)}
-                          autoComplete="off"
-                        />
+                        {isMobile && (
+                          <Button
+                            type="button"
+                            onClick={handleBillCapture}
+                            variant="outline"
+                            disabled={ocrLoading || isCapturing}
+                            className="border-[#F2C927] text-[#333] hover:bg-[#F2C927] hover:text-[#333]"
+                          >
+                            <Camera className="h-4 w-4 mr-2" />
+                            {isCapturing ? 'Scattando...' : 'Scatta Foto'}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
                 )}
-              </CardContent>
-            </CustomCard>
-
-            {/* Invoice Uploads */}
-            {selectedOffers.map(offer => (
-              <CustomCard key={offer.id}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Fattura
-                  </CardTitle>
-                  <p className="text-sm text-gray-600">Carica una fattura recente del cliente</p>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {!invoicesUploaded.has(offer.id) ? (
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                      <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                      <div className="space-y-2">
-                        <p className="text-gray-600">Carica una fattura recente del cliente</p>
-                        <p className="text-sm text-gray-500">PDF, JPG o PNG - Max 10MB</p>
-                        <input
-                          type="file"
-                          accept="application/pdf,image/*"
-                          multiple
-                          onChange={(e) => handleInvoiceUpload(e, offer.id)}
-                          className="hidden"
-                          id={`invoice-upload-${offer.id}`}
+                
+                {/* Bill Previews */}
+                {billPreviews.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {billPreviews.map((src, i) => (
+                      <div key={i} className="border rounded-lg overflow-hidden bg-white">
+                        <img src={src} alt={`bill-${i}`} className="w-full h-32 object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Address Fields */}
+                <div className="space-y-6">
+                  {/* Residenza */}
+                  <div>
+                    <h4 className="font-medium mb-3">Indirizzo di Residenza</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="resVia">Via *</Label>
+                        <Input
+                          id="resVia"
+                          {...register("resVia")}
+                          placeholder="Via/Corso/Piazza"
                         />
-                        <Button
-                          type="button"
-                          onClick={() => document.getElementById(`invoice-upload-${offer.id}`)?.click()}
-                          style={{ backgroundColor: '#F2C927', color: '#333333' }}
-                          className="cursor-pointer"
-                        >
-                          Seleziona File
-                        </Button>
+                        {errors.resVia && (
+                          <p className="text-sm text-red-600 mt-1">{errors.resVia.message}</p>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="resCivico">Civico *</Label>
+                        <Input
+                          id="resCivico"
+                          {...register("resCivico")}
+                          placeholder="123"
+                        />
+                        {errors.resCivico && (
+                          <p className="text-sm text-red-600 mt-1">{errors.resCivico.message}</p>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="resCitta">Città *</Label>
+                        <Input
+                          id="resCitta"
+                          {...register("resCitta")}
+                          placeholder="Milano"
+                        />
+                        {errors.resCitta && (
+                          <p className="text-sm text-red-600 mt-1">{errors.resCitta.message}</p>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="resCap">CAP *</Label>
+                        <Input
+                          id="resCap"
+                          {...register("resCap")}
+                          placeholder="20100"
+                        />
+                        {errors.resCap && (
+                          <p className="text-sm text-red-600 mt-1">{errors.resCap.message}</p>
+                        )}
                       </div>
                     </div>
-                  ) : (
-                    <div className="border border-green-200 bg-green-50 rounded-lg p-4">
-                      <div className="flex items-center gap-2 text-green-700 mb-3">
-                        <CheckCircle className="h-5 w-5" />
-                        <span className="font-medium">Fattura caricata e processata</span>
-                      </div>
+                  </div>
+                  
+                  {/* Checkbox fornitura uguale */}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="fornUguale"
+                      checked={watchFornUguale}
+                      onCheckedChange={(checked) => setValue("fornUguale", !!checked)}
+                    />
+                    <Label htmlFor="fornUguale" className="text-sm">
+                      Fornitura uguale a residenza
+                    </Label>
+                  </div>
+                  
+                  {/* Fornitura */}
+                  {!watchFornUguale && (
+                    <div>
+                      <h4 className="font-medium mb-3">Indirizzo di Fornitura</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <Label htmlFor={`pod-${offer.id}`}>POD</Label>
+                          <Label htmlFor="fornVia">Via *</Label>
                           <Input
-                            id={`pod-${offer.id}`}
-                            value={invoiceData[offer.id]?.pod || ''}
-                            onChange={(e) => updateInvoiceData(offer.id, 'pod', e.target.value)}
-                            autoComplete="off"
+                            id="fornVia"
+                            {...register("fornVia")}
+                            placeholder="Via/Corso/Piazza"
                           />
+                          {errors.fornVia && (
+                            <p className="text-sm text-red-600 mt-1">{errors.fornVia.message}</p>
+                          )}
                         </div>
+                        
                         <div>
-                          <Label htmlFor={`kw-${offer.id}`}>kW Impegnati</Label>
+                          <Label htmlFor="fornCivico">Civico *</Label>
                           <Input
-                            id={`kw-${offer.id}`}
-                            value={invoiceData[offer.id]?.kwImpegnati || ''}
-                            onChange={(e) => updateInvoiceData(offer.id, 'kwImpegnati', e.target.value)}
-                            autoComplete="off"
+                            id="fornCivico"
+                            {...register("fornCivico")}
+                            placeholder="123"
                           />
+                          {errors.fornCivico && (
+                            <p className="text-sm text-red-600 mt-1">{errors.fornCivico.message}</p>
+                          )}
                         </div>
-                        <div className="md:col-span-2">
-                          <Label htmlFor={`fornitura-${offer.id}`}>Indirizzo Fornitura</Label>
+                        
+                        <div>
+                          <Label htmlFor="fornCitta">Città *</Label>
                           <Input
-                            id={`fornitura-${offer.id}`}
-                            value={invoiceData[offer.id]?.indirizzoFornitura || ''}
-                            onChange={(e) => updateInvoiceData(offer.id, 'indirizzoFornitura', e.target.value)}
-                            autoComplete="off"
+                            id="fornCitta"
+                            {...register("fornCitta")}
+                            placeholder="Milano"
                           />
+                          {errors.fornCitta && (
+                            <p className="text-sm text-red-600 mt-1">{errors.fornCitta.message}</p>
+                          )}
                         </div>
-                        <div className="md:col-span-2">
-                          <Label htmlFor={`fatturazione-${offer.id}`}>Indirizzo Fatturazione</Label>
+                        
+                        <div>
+                          <Label htmlFor="fornCap">CAP *</Label>
                           <Input
-                            id={`fatturazione-${offer.id}`}
-                            value={invoiceData[offer.id]?.indirizzoFatturazione || ''}
-                            onChange={(e) => updateInvoiceData(offer.id, 'indirizzoFatturazione', e.target.value)}
-                            autoComplete="off"
+                            id="fornCap"
+                            {...register("fornCap")}
+                            placeholder="20100"
                           />
+                          {errors.fornCap && (
+                            <p className="text-sm text-red-600 mt-1">{errors.fornCap.message}</p>
+                          )}
                         </div>
                       </div>
-                      <div className="mt-4 flex items-center gap-3">
-                        <input
-                          type="file"
-                          accept="application/pdf,image/*"
-                          multiple
-                          onChange={async (e) => {
-                            const files = e.target.files;
-                            if (!files || files.length === 0) return;
-                            try {
-                              setIsProcessing(true);
-                              const existing = uploadedFiles.invoices[offer.id];
-                              if (!existing) return;
-                              const merged = await appendFilesToExistingPdf(existing, files);
-                              if (!merged) return;
-                              // OCR mock sulla versione completa della fattura
-                              const extracted = await processInvoiceOCR(merged);
-                              setInvoiceData(prev => ({ ...prev, [offer.id]: extracted }));
-                              setUploadedFiles(prev => ({
-                                ...prev,
-                                invoices: { ...prev.invoices, [offer.id]: merged }
-                              }));
-                              setInvoicePreviewUrls(prev => {
-                                if (prev[offer.id]) URL.revokeObjectURL(prev[offer.id]);
-                                const newUrl = URL.createObjectURL(merged);
-                                return { ...prev, [offer.id]: newUrl };
-                              });
-                            } catch (err) {
-                              console.error('Append fattura fallito:', err);
-                              setErrors(prev => [...prev, "Errore nell'aggiunta pagine alla fattura."]);
-                            } finally {
-                              setIsProcessing(false);
-                              e.currentTarget.value = '';
-                            }
-                          }}
-                          className="hidden"
-                          id={`invoice-append-${offer.id}`}
-                        />
-                        <Button
-                          type="button"
-                          onClick={() => document.getElementById(`invoice-append-${offer.id}`)?.click()}
-                          style={{ backgroundColor: '#F2C927', color: '#333333' }}
-                        >
-                          Aggiungi pagine fattura
-                        </Button>
-                      </div>
-                      {invoicePreviewUrls[offer.id] && (
-                        <div className="mt-4">
-                          <Label>Anteprima fattura</Label>
-                          <div className="mt-2 border rounded-lg overflow-hidden">
-                            <iframe src={invoicePreviewUrls[offer.id]} title={`Anteprima fattura ${offer.id}`} className="w-full h-72" />
-                          </div>
-                          <div className="mt-2">
-                            <a href={invoicePreviewUrls[offer.id]} target="_blank" rel="noreferrer" className="inline-flex items-center text-sm underline text-blue-700">
-                              Apri in nuova scheda <ExternalLink className="h-4 w-4 ml-1" />
-                            </a>
-                          </div>
+                    </div>
+                  )}
+                  
+                  {/* POD/PDR */}
+                  <div>
+                    <h4 className="font-medium mb-3">Codici di fornitura</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {(selectedOffer?.commodity === "electricity" || !selectedOffer?.commodity) && (
+                        <div>
+                          <Label htmlFor="pod">POD {selectedOffer?.commodity === "electricity" ? "*" : ""}</Label>
+                          <Input
+                            id="pod"
+                            {...register("pod")}
+                            placeholder="IT123E45678901234567890"
+                          />
+                          {errors.pod && (
+                            <p className="text-sm text-red-600 mt-1">{errors.pod.message}</p>
+                          )}
+                          <p className="text-xs text-gray-500 mt-1">Codice per fornitura elettrica</p>
+                        </div>
+                      )}
+
+                      {(selectedOffer?.commodity === "gas" || !selectedOffer?.commodity) && (
+                        <div>
+                          <Label htmlFor="pdr">PDR {selectedOffer?.commodity === "gas" ? "*" : ""}</Label>
+                          <Input
+                            id="pdr"
+                            {...register("pdr")}
+                            placeholder="12345678901234"
+                          />
+                          {errors.pdr && (
+                            <p className="text-sm text-red-600 mt-1">{errors.pdr.message}</p>
+                          )}
+                          <p className="text-xs text-gray-500 mt-1">Codice per fornitura gas</p>
                         </div>
                       )}
                     </div>
+                  </div>
+
+                  {/* Dati tecnici luce */}
+                  {selectedOffer?.commodity === "electricity" && (
+                    <div>
+                      <h4 className="font-medium mb-3">Dati fornitura luce</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="potenzaImpegnataKw">Potenza impegnata (kW) *</Label>
+                          <Input
+                            id="potenzaImpegnataKw"
+                            type="number"
+                            step="0.5"
+                            {...register("potenzaImpegnataKw", { valueAsNumber: true })}
+                            placeholder="3.0"
+                          />
+                          {errors.potenzaImpegnataKw && (
+                            <p className="text-sm text-red-600 mt-1">{errors.potenzaImpegnataKw.message?.toString()}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   )}
-                </CardContent>
-              </CustomCard>
-            ))}
 
-            {/* Processing Indicator */}
-            {(isProcessing || ocrRunning || ocrLoading) && (
-              <Alert className="border-blue-200 bg-blue-50">
-                <Camera className="h-4 w-4 text-blue-600" />
-                <AlertDescription className="text-blue-600">
-                  {ocrLoading ? "Estrazione dati in corso con OCR avanzato..." : 
-                   ocrRunning ? "Estrazione dati in corso con OCR..." : "Elaborazione documento in corso..."}
-                </AlertDescription>
-              </Alert>
-            )}
+                  {/* Dati tecnici gas */}
+                  {selectedOffer?.commodity === "gas" && (
+                    <div>
+                      <h4 className="font-medium mb-3">Dati fornitura gas</h4>
+                      <div>
+                        <Label className="text-sm font-medium mb-3 block">Usi del gas *</Label>
+                        <div className="flex flex-col sm:flex-row gap-4">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="uso-cottura"
+                              checked={watch("usiGas")?.includes("cottura") || false}
+                              onCheckedChange={(checked) => {
+                                const currentUsi = watch("usiGas") || [];
+                                if (checked) {
+                                  setValue("usiGas", [...currentUsi, "cottura"]);
+                                } else {
+                                  setValue("usiGas", currentUsi.filter(uso => uso !== "cottura"));
+                                }
+                              }}
+                            />
+                            <Label htmlFor="uso-cottura" className="text-sm">Cottura</Label>
+                          </div>
 
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="uso-riscaldamento"
+                              checked={watch("usiGas")?.includes("riscaldamento") || false}
+                              onCheckedChange={(checked) => {
+                                const currentUsi = watch("usiGas") || [];
+                                if (checked) {
+                                  setValue("usiGas", [...currentUsi, "riscaldamento"]);
+                                } else {
+                                  setValue("usiGas", currentUsi.filter(uso => uso !== "riscaldamento"));
+                                }
+                              }}
+                            />
+                            <Label htmlFor="uso-riscaldamento" className="text-sm">Riscaldamento</Label>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="uso-acqua-calda"
+                              checked={watch("usiGas")?.includes("acqua_calda") || false}
+                              onCheckedChange={(checked) => {
+                                const currentUsi = watch("usiGas") || [];
+                                if (checked) {
+                                  setValue("usiGas", [...currentUsi, "acqua_calda"]);
+                                } else {
+                                  setValue("usiGas", currentUsi.filter(uso => uso !== "acqua_calda"));
+                                }
+                              }}
+                            />
+                            <Label htmlFor="uso-acqua-calda" className="text-sm">Acqua calda</Label>
+                          </div>
+                        </div>
+                        {errors.usiGas && (
+                          <p className="text-sm text-red-600 mt-1">{errors.usiGas.message?.toString()}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Residenziale radio (only if residential segment) */}
+                  {selectedOffer?.segment === "residential" && (
+                    <div>
+                      <Label className="text-sm font-medium">Residenziale</Label>
+                      <RadioGroup
+                        value={watch("residenziale")}
+                        onValueChange={(value) => setValue("residenziale", value as any)}
+                        className="flex gap-6 mt-2"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="si" id="res-si" />
+                          <Label htmlFor="res-si">Sì</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="no" id="res-no" />
+                          <Label htmlFor="res-no">No</Label>
+                        </div>
+                      </RadioGroup>
+                      {errors.residenziale && (
+                        <p className="text-sm text-red-600 mt-1">{errors.residenziale.message}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+            
             {/* Submit Button */}
             <div className="flex justify-end gap-4">
               <Button
+                type="button"
                 variant="outline"
                 onClick={() => navigate("/offers")}
               >
                 Annulla
               </Button>
               <Button
-                onClick={handleSubmit}
+                type="submit"
                 disabled={isProcessing}
                 className="flex items-center gap-2 px-8"
                 style={{ backgroundColor: '#E6007E', color: 'white' }}
@@ -1379,7 +1348,7 @@ export default function CompileContract() {
                 )}
               </Button>
             </div>
-          </div>
+          </form>
         </div>
       </div>
     </AppLayout>

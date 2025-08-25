@@ -89,8 +89,9 @@ export interface BufferAppendingData {
   frag: Fragment;
   part: Part | null;
   chunkMeta: ChunkMetadata;
+  offset?: number | undefined;
   parent: PlaylistLevelType;
-  data: Uint8Array;
+  data: Uint8Array<ArrayBuffer>;
 }
 
 export interface BufferAppendedData {
@@ -373,6 +374,7 @@ export interface InitPTSFoundData {
   frag: MediaFragment;
   initPTS: number;
   timescale: number;
+  trackId: number;
 }
 
 export interface FragLoadingData {

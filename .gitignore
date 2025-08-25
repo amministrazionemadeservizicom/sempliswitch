@@ -1,10 +1,16 @@
-.netlify/functions/keys/vision-sa.json
 node_modules
 dist
 client/dist
+
+# Environment files
 .env
 .env.*
+
+# Google Cloud credentials
+credentials/
+google-credentials.json
+*.service-account.json
+
+# Netlify functions keys
+.netlify/functions/keys/
 .netlify/functions/keys/vision-sa.json
-node_modules
-dist
-client/dist
