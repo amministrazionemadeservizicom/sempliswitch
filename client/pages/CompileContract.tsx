@@ -443,61 +443,83 @@ export default function CompileContract() {
     }
   };
   
-  // Handle bill upload with OCR (Tesseract.js)
+  // Handle bill upload with OCR (Netlify Functions)
   const handleBillUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
     setOcrLoading(true);
     try {
-      const { text, previews } = await extractTextFromFiles(Array.from(files));
+      const { text, data, previews } = await processBillOCR(Array.from(files));
       setBillPreviews(prev => [...prev, ...previews]);
 
-      // Show success message
-      toast.success("Fattura elaborata con Tesseract.js");
+      console.log("📄 Testo fattura estratto:", text);
+      console.log("📋 Dati fattura parsificati:", data);
 
-      // Parse bill data
-      const { addr, capCitta, pod, pdr, potenzaImpegnata } = parseBillData(text);
+      let filledFields = 0;
 
-      // Try to extract residence address
-      const resAddr = addr("RESIDENZA") || addr("DOMICILIO") || addr("INTESTATARIO");
-      if (resAddr) {
-        setValue("resVia", resAddr.via);
-        setValue("resCivico", resAddr.civico);
-      }
-
-      // Try to extract supply address
-      const supplyAddr = addr("FORNITURA") || addr("UTENZA") || addr("CONTATORE");
-      if (supplyAddr) {
-        setValue("fornVia", supplyAddr.via);
-        setValue("fornCivico", supplyAddr.civico);
-      }
-
-      // Extract CAP and city
-      const location = capCitta();
-      if (location) {
-        setValue("resCap", location.cap);
-        setValue("resCitta", location.citta);
-        if (!supplyAddr && resAddr) {
-          setValue("fornCap", location.cap);
-          setValue("fornCitta", location.citta);
+      // Extract residence address from parsed data
+      if (data.residenza) {
+        if (data.residenza.via) {
+          setValue("resVia", data.residenza.via);
+          filledFields++;
+        }
+        if (data.residenza.civico) {
+          setValue("resCivico", data.residenza.civico);
+          filledFields++;
+        }
+        if (data.residenza.cap) {
+          setValue("resCap", data.residenza.cap);
+          filledFields++;
+        }
+        if (data.residenza.citta) {
+          setValue("resCitta", data.residenza.citta);
+          filledFields++;
         }
       }
 
-      // Extract POD/PDR based on commodity
-      if (selectedOffer?.commodity === "electricity" && pod) {
-        setValue("pod", pod);
-      }
-      if (selectedOffer?.commodity === "gas" && pdr) {
-        setValue("pdr", pdr);
+      // Extract supply address from parsed data
+      if (data.fornitura) {
+        if (data.fornitura.via) {
+          setValue("fornVia", data.fornitura.via);
+          filledFields++;
+        }
+        if (data.fornitura.civico) {
+          setValue("fornCivico", data.fornitura.civico);
+          filledFields++;
+        }
+        if (data.fornitura.cap) {
+          setValue("fornCap", data.fornitura.cap);
+          filledFields++;
+        }
+        if (data.fornitura.citta) {
+          setValue("fornCitta", data.fornitura.citta);
+          filledFields++;
+        }
       }
 
-      // Extract potenza impegnata for electricity
-      if (selectedOffer?.commodity === "electricity" && potenzaImpegnata) {
-        setValue("potenzaImpegnataKw", potenzaImpegnata);
+      // Set POD/PDR based on commodity
+      if (selectedOffer?.commodity === "electricity" && data.pod) {
+        setValue("pod", data.pod);
+        filledFields++;
       }
+      if (selectedOffer?.commodity === "gas" && data.pdr) {
+        setValue("pdr", data.pdr);
+        filledFields++;
+      }
+
+      // Set potenza impegnata for electricity
+      if (selectedOffer?.commodity === "electricity" && data.potenzaImpegnata) {
+        setValue("potenzaImpegnataKw", data.potenzaImpegnata);
+        filledFields++;
+      }
+
+      console.log(`📊 Totale campi fattura compilati: ${filledFields}`);
+
+      // Show success message
+      toast.success(`Fattura elaborata con Netlify OCR. ${filledFields} campi compilati automaticamente.`);
 
       setBillUploaded(true);
-      setOcrSource(prev => ({ ...prev, bill: 'tesseract' }));
+      setOcrSource(prev => ({ ...prev, bill: 'netlify' }));
 
     } catch (err: any) {
       console.error("Bill OCR error:", err);
