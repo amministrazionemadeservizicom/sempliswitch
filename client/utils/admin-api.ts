@@ -1,6 +1,34 @@
 // Admin API utilities for Firebase operations
 
-export const adminApi = {
+// Define the interface for adminApi to ensure TypeScript recognizes all methods
+interface AdminApiInterface {
+  getAllContracts(): Promise<any[]>;
+  updateContractStatus(contractId: string, status: string, notes?: string): Promise<any>;
+  updateContract(contractId: string, updateData: {
+    statoOfferta?: string;
+    noteStatoOfferta?: string;
+    contatto?: {
+      nome: string;
+      cognome: string;
+      codiceFiscale: string;
+    };
+    ragioneSociale?: string;
+  }): Promise<any>;
+  deleteContract(contractId: string): Promise<any>;
+  createUser(userData: {
+    nome: string;
+    email: string;
+    password: string;
+    ruolo: string;
+    stato: boolean;
+    pianoCompensi?: string;
+    gestoriAssegnati?: string[];
+    master?: string;
+  }): Promise<any>;
+  testFirebaseAdmin(): Promise<any>;
+}
+
+export const adminApi: AdminApiInterface = {
   // Get all contracts using admin privileges
   async getAllContracts() {
     try {
