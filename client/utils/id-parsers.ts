@@ -189,10 +189,21 @@ export function parseCIE(text: string): ParsedFields {
   }
 
   // Extract document number (format like CA89525IB)
-  const docNumMatch = t.match(/\b([A-Z]{2}\d{5}[A-Z]{1,2})\b/) || t.match(/N\.[\s]*([A-Z0-9]{6,12})/i);
-  if (docNumMatch) {
-    numeroDocumento = docNumMatch[1];
-    console.log('📝 Found numeroDocumento:', numeroDocumento);
+  const docNumPatterns = [
+    /\b([A-Z]{2}\d{5}[A-Z]{1,2})\b/,  // Standard CIE format like CA89525IB
+    /N\.[\s]*([A-Z0-9]{6,12})/i,      // Old format with N.
+    /NUMERO[:\s]*([A-Z0-9]{6,12})/i,  // With NUMERO label
+    /([A-Z]{2}\d{5}[A-Z]{2})/,        // More flexible pattern
+    /([A-Z0-9]{8,12})/                // Generic alphanumeric code
+  ];
+
+  for (const pattern of docNumPatterns) {
+    const match = t.match(pattern);
+    if (match) {
+      numeroDocumento = match[1];
+      console.log('📝 Found numeroDocumento with pattern:', numeroDocumento);
+      break;
+    }
   }
 
   // Extract birth date and place
