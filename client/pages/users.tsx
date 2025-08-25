@@ -203,6 +203,8 @@ export default function Users() {
       });
       setIsCreateModalOpen(false);
       resetForm();
+      // Refresh the user list to show the newly created user
+      await fetchUsers();
     } catch (err) {
       toast({
         variant: "destructive",
