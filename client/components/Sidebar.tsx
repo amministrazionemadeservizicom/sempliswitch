@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Home,
   Plus,
@@ -60,7 +60,10 @@ export default function Sidebar({ userRole, isCollapsed = false, onToggle, userF
   const [overflowItems, setOverflowItems] = useState<MenuItem[]>([]);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
-  const filteredMenuItems = menuItems.filter(item => item.roles.includes(userRole));
+  const filteredMenuItems = useMemo(() =>
+    menuItems.filter(item => item.roles.includes(userRole)),
+    [userRole]
+  );
 
   // Calculate initials from userFullName
   const initials = userFullName
