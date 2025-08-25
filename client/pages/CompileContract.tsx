@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import { extractTextFromFiles, terminateOcrWorker } from "@/utils/ocr";
 import { detectDocType, parseFieldsByType } from "@/utils/id-parsers";
-import { extractDocumentData, extractBillData, isGoogleOCRAvailable } from "@/utils/google-ocr";
+import { extractDocumentData, extractBillData, isGoogleOCRAvailable } from "../utils/google-ocr";
 
 // Regex patterns
 const CF_REGEX = /^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/;
