@@ -67,6 +67,19 @@ export default function Contracts() {
   const [noteText, setNoteText] = useState('');
 
   useEffect(() => {
+    const runFirebaseTest = async () => {
+      const testResult = await testFirebaseConnection();
+      console.log("🧪 Firebase test result:", testResult);
+
+      if (!testResult.success) {
+        toast({
+          variant: "destructive",
+          title: "Problema Firebase",
+          description: testResult.error || "Errore nella connessione Firebase"
+        });
+      }
+    };
+
     const fetchContracts = async () => {
     try {
       setLoading(true);
@@ -213,7 +226,7 @@ export default function Contracts() {
     setContracts(contracts.filter(c => c.id !== contractId));
     toast({
       title: "Contratto eliminato",
-      description: "Il contratto è stato rimosso dal sistema",
+      description: "Il contratto �� stato rimosso dal sistema",
     });
   };
 
