@@ -847,10 +847,7 @@ export default function Offers() {
                     {hasCommissionPlan() && (
                       <div className="mb-6 flex items-center justify-between bg-white p-4 rounded-lg border">
                         <span className="text-sm font-medium">💰 Compenso base:</span>
-                        <button
-                          onClick={() => toggleCommissionVisibility(offer.id)}
-                          className="flex items-center gap-2 text-sm hover:text-gray-900"
-                        >
+                        <div className="flex items-center gap-2 text-sm">
                           {visibleCommissions.has(offer.id) ? (
                             <>
                               <div className="flex items-center space-x-2">
@@ -868,15 +865,27 @@ export default function Offers() {
                                   👁
                                 </button>
                               </div>
-                              <EyeOff className="h-4 w-4" />
+                              <button
+                                onClick={() => toggleCommissionVisibility(offer.id)}
+                                className="flex items-center gap-1 hover:text-gray-900"
+                                title="Nascondi compenso"
+                              >
+                                <EyeOff className="h-4 w-4" />
+                              </button>
                             </>
                           ) : (
                             <>
                               <span className="blur-sm text-lg font-bold">€•••</span>
-                              <Eye className="h-4 w-4" />
+                              <button
+                                onClick={() => toggleCommissionVisibility(offer.id)}
+                                className="flex items-center gap-1 hover:text-gray-900"
+                                title="Mostra compenso"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </button>
                             </>
                           )}
-                        </button>
+                        </div>
                       </div>
                     )}
 
