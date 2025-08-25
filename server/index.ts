@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
+import fileUpload from "express-fileupload";
 import { handleDemo } from "./routes/demo";
+import { handleDocumentOCR, handleBillOCR } from "./routes/ocr";
 
 export function createServer() {
   const app = express();
