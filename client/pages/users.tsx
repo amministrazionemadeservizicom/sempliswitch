@@ -659,6 +659,27 @@ export default function Users() {
                               <div className="mt-1">{getRoleBadge(user.ruolo)}</div>
                             </div>
                           </div>
+
+                          <div className="flex gap-2 pt-3 border-t">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditUser(user)}
+                              className="flex-1"
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              Modifica
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteUser(user)}
+                              className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Elimina
+                            </Button>
+                          </div>
                         </CardContent>
                       </Card>
                     ))}
