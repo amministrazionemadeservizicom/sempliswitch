@@ -92,10 +92,11 @@ function extractCleanField(text: string, pattern: RegExp): string | undefined {
 // Parser CIE (solo da testo OCR + MRZ semplificata)
 export function parseCIE(text: string): ParsedFields {
   // Split text into lines to handle multiline format
-  const lines = text.split(/[\r\n]+/).map(line => line.trim());
+  const lines = text.split(/[\r\n]+/).map(line => line.trim()).filter(line => line.length > 0);
   const t = text.replace(/\s+/g," ").trim();
 
   console.log('🔍 Parsing CIE text:', t);
+  console.log('📝 Lines found:', lines);
 
   let nome, cognome, scadenza, numeroDocumento, dataNascita, luogoNascita, emissione;
 
