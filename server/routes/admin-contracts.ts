@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { Contract, ContractStatus } from "../../client/types/contracts";
 
 export async function handleAdminContracts(req: Request, res: Response) {
   // Set CORS headers
@@ -35,27 +36,27 @@ export async function handleAdminContracts(req: Request, res: Response) {
         };
 
         // Get all contracts first
-        let contracts = await adminOperations.getAllContracts();
+        let contracts: Contract[] = await adminOperations.getAllContracts();
 
         // Apply filters
         if (filters.status && filters.status !== 'all') {
-          contracts = contracts.filter(c => c.statoOfferta === filters.status);
+          contracts = contracts.filter((c: Contract) => c.statoOfferta === filters.status);
         }
 
         if (filters.createdBy) {
-          contracts = contracts.filter(c => c.creatoDa?.id === filters.createdBy);
+          contracts = contracts.filter((c: Contract) => c.creatoDa?.id === filters.createdBy);
         }
 
         if (filters.gestore) {
-          contracts = contracts.filter(c => c.gestore === filters.gestore);
+          contracts = contracts.filter((c: Contract) => c.gestore === filters.gestore);
         }
 
         if (filters.tipologia) {
-          contracts = contracts.filter(c => c.tipologiaContratto === filters.tipologia);
+          contracts = contracts.filter((c: Contract) => c.tipologiaContratto === filters.tipologia);
         }
 
         if (filters.onlyLocked) {
-          contracts = contracts.filter(c => {
+          contracts = contracts.filter((c: Contract) => {
             if (!c.lock) return false;
             const lockTime = new Date(c.lock.dataLock).getTime();
             const now = new Date().getTime();
@@ -65,7 +66,7 @@ export async function handleAdminContracts(req: Request, res: Response) {
         }
 
         if (filters.onlyMine && filters.userId) {
-          contracts = contracts.filter(c =>
+          contracts = contracts.filter((c: Contract) =>
             c.creatoDa?.id === filters.userId ||
             (c.lock && c.lock.lockedBy?.id === filters.userId)
           );
@@ -73,12 +74,12 @@ export async function handleAdminContracts(req: Request, res: Response) {
 
         if (filters.dateFrom) {
           const fromDate = new Date(filters.dateFrom);
-          contracts = contracts.filter(c => new Date(c.dataCreazione) >= fromDate);
+          contracts = contracts.filter((c: Contract) => new Date(c.dataCreazione) >= fromDate);
         }
 
         if (filters.dateTo) {
           const toDate = new Date(filters.dateTo);
-          contracts = contracts.filter(c => new Date(c.dataCreazione) <= toDate);
+          contracts = contracts.filter((c: Contract) => new Date(c.dataCreazione) <= toDate);
         }
 
         return res.status(200).json({

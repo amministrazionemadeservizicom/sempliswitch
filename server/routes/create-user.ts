@@ -18,7 +18,7 @@ export async function handleCreateUser(req: Request, res: Response) {
     // Dynamically import Firebase Admin to avoid initialization issues
     const { adminOperations } = await import('../../server/firebase-admin');
 
-    const result = await adminOperations.createUser(userData);
+    const result = await adminOperations.createUserWithRole(userData);
 
     return res.status(200).json({
       success: true,

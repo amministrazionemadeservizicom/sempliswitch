@@ -1,4 +1,5 @@
 import { Context } from "@netlify/functions";
+import { Contract } from "../../client/types/contracts";
 
 export default async (request: Request, context: Context) => {
   // Set CORS headers
@@ -25,7 +26,7 @@ export default async (request: Request, context: Context) => {
     switch (method) {
       case 'GET':
         // Get all contracts with admin privileges
-        const contracts = await adminOperations.getAllContracts();
+        const contracts: Contract[] = await adminOperations.getAllContracts();
         return new Response(JSON.stringify({
           success: true,
           contracts,

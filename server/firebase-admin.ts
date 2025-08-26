@@ -2,6 +2,7 @@ import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
 import * as path from 'path';
 import fs from 'fs';
+import { Contract } from '../client/types/contracts';
 
 let isFirebaseInitialized = false;
 
@@ -94,7 +95,7 @@ export const adminOperations = {
     email: string;
     password: string;
     nome: string;
-    cognome: string;
+    cognome?: string;
     ruolo: string;
     [key: string]: any;
   }) {
@@ -107,7 +108,7 @@ export const adminOperations = {
       const userRecord = await adminAuth.createUser({
         email: userData.email,
         password: userData.password,
-        displayName: `${userData.nome} ${userData.cognome}`,
+        displayName: userData.cognome ? `${userData.nome} ${userData.cognome}` : userData.nome,
       });
 
       // Set custom claims for role
@@ -120,7 +121,7 @@ export const adminOperations = {
         uid: userRecord.uid,
         email: userData.email,
         nome: userData.nome,
-        cognome: userData.cognome,
+        cognome: userData.cognome || '',
         ruolo: userData.ruolo,
         attivo: true,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -136,7 +137,7 @@ export const adminOperations = {
   },
 
   // Get all contracts with admin privileges
-  async getAllContracts() {
+  async getAllContracts(): Promise<Contract[]> {
     if (!isFirebaseInitialized || !adminDb) {
       console.warn('⚠️ Firebase not available, returning empty contracts list');
       return [];
@@ -147,7 +148,7 @@ export const adminOperations = {
       return snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      } as Contract));
     } catch (error) {
       console.error('❌ Error fetching contracts:', error);
       // Return empty array instead of throwing to prevent breaking the UI
@@ -177,16 +178,7 @@ export const adminOperations = {
   },
 
   // Update full contract with admin privileges
-  async updateContract(contractId: string, updateData: {
-    statoOfferta?: string;
-    noteStatoOfferta?: string;
-    contatto?: {
-      nome: string;
-      cognome: string;
-      codiceFiscale: string;
-    };
-    ragioneSociale?: string;
-  }) {
+  async updateContract(contractId: string, updateData: Partial<Contract>) {
     if (!isFirebaseInitialized || !adminDb) {
       throw new Error('Firebase Admin SDK not properly initialized. Cannot update contract.');
     }
@@ -196,10 +188,22 @@ export const adminOperations = {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       };
 
+      // Handle all possible Contract properties
       if (updateData.statoOfferta) updateFields.statoOfferta = updateData.statoOfferta;
       if (updateData.noteStatoOfferta !== undefined) updateFields.noteStatoOfferta = updateData.noteStatoOfferta;
       if (updateData.contatto) updateFields.contatto = updateData.contatto;
       if (updateData.ragioneSociale !== undefined) updateFields.ragioneSociale = updateData.ragioneSociale;
+      if (updateData.lock !== undefined) updateFields.lock = updateData.lock;
+      if (updateData.cronologiaStati) updateFields.cronologiaStati = updateData.cronologiaStati;
+      if (updateData.dataUltimaIntegrazione !== undefined) updateFields.dataUltimaIntegrazione = updateData.dataUltimaIntegrazione;
+      if (updateData.nuoviPodAggiunti !== undefined) updateFields.nuoviPodAggiunti = updateData.nuoviPodAggiunti;
+      if (updateData.documenti) updateFields.documenti = updateData.documenti;
+      if (updateData.pod) updateFields.pod = updateData.pod;
+      if (updateData.pdr) updateFields.pdr = updateData.pdr;
+      if (updateData.gestore) updateFields.gestore = updateData.gestore;
+      if (updateData.tipologiaContratto) updateFields.tipologiaContratto = updateData.tipologiaContratto;
+      if (updateData.masterReference !== undefined) updateFields.masterReference = updateData.masterReference;
+      if (updateData.isBusiness !== undefined) updateFields.isBusiness = updateData.isBusiness;
 
       await adminDb.collection('contracts').doc(contractId).update(updateFields);
 
