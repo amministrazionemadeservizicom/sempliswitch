@@ -12,6 +12,8 @@ export default defineConfig(({ mode }) => ({
   build: {
     outDir: "dist/spa",
   },
+  // Prevent Vite from trying to transform HTML files
+  assetsInclude: ["**/*.html"],
   plugins: [
     react(),
     // Only use Express plugin in standalone Vite mode, not with Netlify Dev
