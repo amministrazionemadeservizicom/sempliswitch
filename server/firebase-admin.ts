@@ -1,31 +1,91 @@
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
 import * as path from 'path';
+import fs from 'fs';
+
+let isFirebaseInitialized = false;
 
 // Initialize Firebase Admin SDK if not already initialized
 if (!admin.apps.length) {
-  const serviceAccountPath = path.join(process.cwd(), 'credentials', 'firebase-admin-credentials.json');
-  
   try {
     console.log('🔥 Initializing Firebase Admin SDK...');
-    console.log('📁 Service account path:', serviceAccountPath);
-    
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccountPath),
-      projectId: 'sempliswitch'
-    });
-    
-    console.log('✅ Firebase Admin SDK initialized successfully');
+
+    // Method 1: Try environment variables first (most secure)
+    if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+      console.log('📋 Using Firebase credentials from environment variables...');
+
+      const serviceAccount = {
+        projectId: process.env.FIREBASE_PROJECT_ID || 'sempliswitch',
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      };
+
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        projectId: 'sempliswitch'
+      });
+
+      isFirebaseInitialized = true;
+      console.log('✅ Firebase Admin SDK initialized with environment variables');
+
+    } else {
+      // Method 2: Try service account file (fallback)
+      const serviceAccountPath = path.join(process.cwd(), 'credentials', 'firebase-admin-credentials.json');
+      console.log('📁 Trying service account file:', serviceAccountPath);
+
+      // Check if file exists and is valid
+      if (fs.existsSync(serviceAccountPath)) {
+        const serviceAccountContent = fs.readFileSync(serviceAccountPath, 'utf8');
+        const serviceAccount = JSON.parse(serviceAccountContent);
+
+        // Validate that private key is complete
+        if (serviceAccount.private_key && serviceAccount.private_key.length > 100) {
+          admin.initializeApp({
+            credential: admin.credential.cert(serviceAccountPath),
+            projectId: 'sempliswitch'
+          });
+
+          isFirebaseInitialized = true;
+          console.log('✅ Firebase Admin SDK initialized with service account file');
+        } else {
+          console.warn('⚠️ Service account file has incomplete private key');
+          throw new Error('Incomplete private key in service account file');
+        }
+      } else {
+        console.warn('⚠️ Service account file not found:', serviceAccountPath);
+        throw new Error('Service account file not found');
+      }
+    }
+
   } catch (error) {
     console.error('❌ Failed to initialize Firebase Admin SDK:', error);
-    throw error;
+    console.log(`
+🔧 To fix this Firebase Admin authentication issue:
+
+METHOD 1 - Environment Variables (Recommended):
+Set these environment variables:
+- FIREBASE_PROJECT_ID=sempliswitch
+- FIREBASE_CLIENT_EMAIL=firebase-adminsdk-fbsvc@sempliswitch.iam.gserviceaccount.com
+- FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\\nYour\\nComplete\\nPrivate\\nKey\\n-----END PRIVATE KEY-----\\n"
+
+METHOD 2 - Fix Service Account File:
+Ensure the credentials/firebase-admin-credentials.json file has a complete private_key field
+
+For now, the system will operate in fallback mode with limited functionality.
+    `);
+
+    // Don't throw error - allow system to continue with fallbacks
+    isFirebaseInitialized = false;
   }
 }
 
-// Export admin instances
-export const adminDb = getFirestore();
-export const adminAuth = admin.auth();
+// Export admin instances (conditional based on initialization)
+export const adminDb = isFirebaseInitialized ? getFirestore() : null;
+export const adminAuth = isFirebaseInitialized ? admin.auth() : null;
 export default admin;
+
+// Helper function to check if Firebase is available
+export const isFirebaseAvailable = () => isFirebaseInitialized;
 
 // Helper functions for common operations
 export const adminOperations = {
@@ -38,6 +98,10 @@ export const adminOperations = {
     ruolo: string;
     [key: string]: any;
   }) {
+    if (!isFirebaseInitialized || !adminAuth || !adminDb) {
+      throw new Error('Firebase Admin SDK not properly initialized. Please check credentials.');
+    }
+
     try {
       // Create user in Authentication
       const userRecord = await adminAuth.createUser({
@@ -73,6 +137,11 @@ export const adminOperations = {
 
   // Get all contracts with admin privileges
   async getAllContracts() {
+    if (!isFirebaseInitialized || !adminDb) {
+      console.warn('⚠️ Firebase not available, returning empty contracts list');
+      return [];
+    }
+
     try {
       const snapshot = await adminDb.collection('contracts').get();
       return snapshot.docs.map(doc => ({
@@ -81,19 +150,24 @@ export const adminOperations = {
       }));
     } catch (error) {
       console.error('❌ Error fetching contracts:', error);
-      throw error;
+      // Return empty array instead of throwing to prevent breaking the UI
+      return [];
     }
   },
 
   // Update contract status with admin privileges
   async updateContractStatus(contractId: string, status: string, notes?: string) {
+    if (!isFirebaseInitialized || !adminDb) {
+      throw new Error('Firebase Admin SDK not properly initialized. Cannot update contract status.');
+    }
+
     try {
       await adminDb.collection('contracts').doc(contractId).update({
         statoOfferta: status,
         noteStatoOfferta: notes || '',
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
-      
+
       console.log('✅ Contract status updated:', contractId);
       return true;
     } catch (error) {
@@ -113,6 +187,10 @@ export const adminOperations = {
     };
     ragioneSociale?: string;
   }) {
+    if (!isFirebaseInitialized || !adminDb) {
+      throw new Error('Firebase Admin SDK not properly initialized. Cannot update contract.');
+    }
+
     try {
       const updateFields: any = {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -171,6 +249,10 @@ export const adminOperations = {
     residenziale?: string;
     offerte: any[];
   }, userId: string, userName: string, userSurname: string, masterReference?: string) {
+    if (!isFirebaseInitialized || !adminDb) {
+      throw new Error('Firebase Admin SDK not properly initialized. Cannot save contract.');
+    }
+
     try {
       // Generate unique contract code
       const timestamp = Date.now();
@@ -229,7 +311,7 @@ export const adminOperations = {
       // Clean undefined values
       const cleanedContract = this.cleanUndefinedValues(contractForFirebase);
 
-      console.log('💾 Saving contract via Admin SDK:', cleanedContract);
+      console.log('��� Saving contract via Admin SDK:', cleanedContract);
 
       const docRef = await adminDb.collection('contracts').add(cleanedContract);
 
@@ -272,6 +354,10 @@ export const adminOperations = {
 
   // Delete contract with admin privileges
   async deleteContract(contractId: string) {
+    if (!isFirebaseInitialized || !adminDb) {
+      throw new Error('Firebase Admin SDK not properly initialized. Cannot delete contract.');
+    }
+
     try {
       await adminDb.collection('contracts').doc(contractId).delete();
       console.log('✅ Contract deleted:', contractId);

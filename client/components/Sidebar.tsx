@@ -9,6 +9,7 @@ import {
   BarChart3,
   Settings,
   Users,
+  User,
   Zap,
   TrendingUp,
   Calculator,
@@ -32,17 +33,19 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { id: "dashboard", label: "Dashboard", icon: Home, href: "/dashboard", roles: ["consulente", "backoffice"] },
   { id: "admin-dashboard", label: "Dashboard", icon: Home, href: "/admin-dashboard", roles: ["admin"] },
-  { id: "new-practice", label: "Nuova Pratica", icon: Plus, href: "/new-practice", roles: ["consulente", "backoffice", "admin"] },
-  { id: "contracts", label: "Contratti", icon: ClipboardList, href: "/contracts", roles: ["consulente", "backoffice", "admin"] },
- { id: "offers", label: "Offerte", icon: TrendingUp, href: "/offers", roles: ["admin"] },
-  { id: "simulation", label: "Simulazione", icon: Calculator, href: "/simulation", roles: ["consulente"] },
-  { id: "commissions", label: "Provvigioni", icon: Coins, href: "/commissions", roles: ["admin"] },
-  { id: "processing", label: "Stato Lavorazione", icon: BarChart3, href: "/processing", roles: ["backoffice", "admin"] },
+  { id: "master-dashboard", label: "Dashboard", icon: Home, href: "/dashboard", roles: ["master"] },
+  { id: "new-practice", label: "Nuova Pratica", icon: Plus, href: "/new-practice", roles: ["consulente", "backoffice", "admin", "master"] },
+  { id: "contracts", label: "Contratti", icon: ClipboardList, href: "/contracts", roles: ["consulente", "backoffice", "admin", "master"] },
+  { id: "offers", label: "Offerte", icon: TrendingUp, href: "/offers", roles: ["admin", "master"] },
+  { id: "simulation", label: "Simulazione", icon: Calculator, href: "/simulation", roles: ["consulente", "master"] },
+  { id: "commissions", label: "Provvigioni", icon: Coins, href: "/commissions", roles: ["admin", "master"] },
+  { id: "processing", label: "Stato Lavorazione", icon: BarChart3, href: "/processing", roles: ["backoffice", "admin", "master"] },
   { id: "users", label: "Gestione Utenti", icon: Users, href: "/users", roles: ["admin"] },
   { id: "commission-plans", label: "Piani Compensi", icon: Coins, href: "/commission-plans", roles: ["admin"] },
   { id: "admin-offers", label: "Gestione Offerte", icon: Zap, href: "/AdminOffers", roles: ["admin"] },
-  { id: "reports", label: "Report", icon: BarChart3, href: "/reports", roles: ["admin"] },
+  { id: "reports", label: "Report", icon: BarChart3, href: "/reports", roles: ["admin", "master"] },
   { id: "settings", label: "Configurazioni", icon: Settings, href: "/settings", roles: ["admin"] },
+  { id: "profile", label: "Il Mio Profilo", icon: User, href: "/profile", roles: ["consulente", "backoffice", "admin", "master"] },
 ];
 
 interface SidebarProps {
@@ -61,17 +64,20 @@ export default function Sidebar({ userRole, isCollapsed = false, onToggle, userF
   const [overflowItems, setOverflowItems] = useState<MenuItem[]>([]);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
-  const filteredMenuItems = useMemo(() =>
-    menuItems.filter(item => item.roles.includes(userRole)),
-    [userRole]
-  );
+  const filteredMenuItems = useMemo(() => {
+    const filtered = menuItems.filter(item => item.roles.includes(userRole));
+    console.log('🔍 Sidebar - userRole:', userRole, 'filtered items:', filtered.length);
+    return filtered;
+  }, [userRole]);
 
   // Calculate initials from userFullName
-  const initials = userFullName
-    .split(' ')
-    .slice(0, 2)
-    .map(word => word.charAt(0).toUpperCase())
-    .join('');
+  const initials = (userFullName && userFullName !== 'Utente')
+    ? userFullName
+        .split(' ')
+        .slice(0, 2)
+        .map(word => word.charAt(0).toUpperCase())
+        .join('')
+    : 'U';
 
   const handleLogout = () => {
     localStorage.clear();
@@ -186,9 +192,9 @@ export default function Sidebar({ userRole, isCollapsed = false, onToggle, userF
           {isCollapsed ? (
             <>
               <button
-                onClick={onUserClick}
+                onClick={() => navigate('/profile')}
                 className="flex items-center justify-center w-8 h-8 bg-black rounded-full text-yellow-400 font-semibold text-sm mx-auto hover:bg-opacity-80 transition-all"
-                title={`${userFullName} - Clicca per modificare profilo`}
+                title={`${userFullName || 'Utente'} - Clicca per vedere il profilo`}
               >
                 {initials}
               </button>
@@ -203,12 +209,12 @@ export default function Sidebar({ userRole, isCollapsed = false, onToggle, userF
           ) : (
             <>
               <button
-                onClick={onUserClick}
+                onClick={() => navigate('/profile')}
                 className="text-sm text-[#333333] w-full text-left p-2 hover:bg-black hover:bg-opacity-5 rounded-lg transition-colors"
               >
-                <div className="font-medium">{userFullName}</div>
+                <div className="font-medium">{userFullName || 'Utente'}</div>
                 <div className="capitalize text-xs opacity-70">{userRole}</div>
-                <div className="text-xs opacity-50 mt-1">Clicca per modificare profilo</div>
+                <div className="text-xs opacity-50 mt-1">Clicca per vedere il profilo</div>
               </button>
               <button
                 onClick={handleLogout}
@@ -326,14 +332,14 @@ export default function Sidebar({ userRole, isCollapsed = false, onToggle, userF
             <div className="p-4 border-t border-yellow-600 border-opacity-30 space-y-3">
               <button
                 onClick={() => {
-                  onUserClick?.();
+                  navigate('/profile');
                   setIsMobileMenuOpen(false);
                 }}
                 className="text-sm text-[#333333] w-full text-left p-2 hover:bg-black hover:bg-opacity-5 rounded-lg transition-colors"
               >
-                <div className="font-medium">{userFullName}</div>
+                <div className="font-medium">{userFullName || 'Utente'}</div>
                 <div className="capitalize text-xs opacity-70">{userRole}</div>
-                <div className="text-xs opacity-50 mt-1">Clicca per modificare profilo</div>
+                <div className="text-xs opacity-50 mt-1">Clicca per vedere il profilo</div>
               </button>
               <button
                 onClick={() => {

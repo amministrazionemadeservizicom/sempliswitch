@@ -11,7 +11,7 @@
     ]
   },
   "scripts": {
-    "dev": "netlify dev --offline",
+    "dev": "npx netlify dev --offline",
     "dev:vite": "vite",
     "dev:local": "vite",
     "dev:functions": "netlify functions:serve",

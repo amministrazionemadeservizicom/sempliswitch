@@ -29,9 +29,21 @@ interface MonthlyCommissionData {
   commissionPlan: CommissionPlan;
 }
 
+interface ComparisonData {
+  previousMonth: {
+    commission: number;
+    percentage: number;
+  };
+  sameMonthLastYear: {
+    commission: number;
+    percentage: number;
+  };
+}
+
 interface MonthlyCommissionWidgetProps {
   data: MonthlyCommissionData;
-  target?: number; // Monthly target
+  comparisons?: ComparisonData;
+  commissionPlanName?: string;
 }
 
 const MONTHS = [
@@ -66,7 +78,7 @@ const SERVICE_CONFIG = [
   }
 ];
 
-export default function MonthlyCommissionWidget({ data, target = 2000 }: MonthlyCommissionWidgetProps) {
+export default function MonthlyCommissionWidget({ data, comparisons, commissionPlanName = "Piano Standard" }: MonthlyCommissionWidgetProps) {
   const calculations = useMemo(() => {
     const services = SERVICE_CONFIG.map(service => {
       const contractCount = data.contracts[service.key];
@@ -83,15 +95,11 @@ export default function MonthlyCommissionWidget({ data, target = 2000 }: Monthly
 
     const totalCommission = services.reduce((sum, service) => sum + service.total, 0);
     const totalContracts = services.reduce((sum, service) => sum + service.contractCount, 0);
-    const avgPerContract = totalContracts > 0 ? totalCommission / totalContracts : 0;
-    const targetProgress = (totalCommission / target) * 100;
 
     return {
       services,
       totalCommission,
       totalContracts,
-      avgPerContract,
-      targetProgress,
       monthName: MONTHS[data.month]
     };
   }, [data, target]);
@@ -106,7 +114,7 @@ export default function MonthlyCommissionWidget({ data, target = 2000 }: Monthly
               Calcolo Provvigioni
             </CardTitle>
             <CardDescription>
-              {calculations.monthName} {data.year} - Piano Compensi Personale
+              {calculations.monthName} {data.year} - {commissionPlanName}
             </CardDescription>
           </div>
           <Badge variant="outline" className="text-sm">
@@ -127,23 +135,46 @@ export default function MonthlyCommissionWidget({ data, target = 2000 }: Monthly
               <Euro className="h-8 w-8 text-green-600" />
             </div>
           </div>
-          
+
           <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-4 rounded-lg border border-blue-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-blue-700">Media Contratto</p>
-                <p className="text-2xl font-bold text-blue-900">€{Math.round(calculations.avgPerContract)}</p>
+                <p className="text-sm font-medium text-blue-700">vs Mese Precedente</p>
+                <div className="flex items-center gap-1">
+                  {comparisons?.previousMonth.percentage >= 0 ? (
+                    <TrendingUp className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <TrendingDown className="h-4 w-4 text-red-500" />
+                  )}
+                  <p className={`text-lg font-bold ${
+                    comparisons?.previousMonth.percentage >= 0 ? 'text-green-900' : 'text-red-900'
+                  }`}>
+                    {comparisons?.previousMonth.percentage >= 0 ? '+' : ''}{comparisons?.previousMonth.percentage?.toFixed(1) || '0.0'}%
+                  </p>
+                </div>
+                <p className="text-xs text-blue-600">€{comparisons?.previousMonth.commission || 0}</p>
               </div>
               <Calculator className="h-8 w-8 text-blue-600" />
             </div>
           </div>
-          
+
           <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-4 rounded-lg border border-purple-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-purple-700">Obiettivo</p>
-                <p className="text-lg font-bold text-purple-900">{Math.round(calculations.targetProgress)}%</p>
-                <Progress value={calculations.targetProgress} className="h-2 mt-1" />
+                <p className="text-sm font-medium text-purple-700">vs Anno Precedente</p>
+                <div className="flex items-center gap-1">
+                  {comparisons?.sameMonthLastYear.percentage >= 0 ? (
+                    <TrendingUp className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <TrendingDown className="h-4 w-4 text-red-500" />
+                  )}
+                  <p className={`text-lg font-bold ${
+                    comparisons?.sameMonthLastYear.percentage >= 0 ? 'text-green-900' : 'text-red-900'
+                  }`}>
+                    {comparisons?.sameMonthLastYear.percentage >= 0 ? '+' : ''}{comparisons?.sameMonthLastYear.percentage?.toFixed(1) || '0.0'}%
+                  </p>
+                </div>
+                <p className="text-xs text-purple-600">€{comparisons?.sameMonthLastYear.commission || 0}</p>
               </div>
               <Target className="h-8 w-8 text-purple-600" />
             </div>
@@ -205,21 +236,6 @@ export default function MonthlyCommissionWidget({ data, target = 2000 }: Monthly
           </div>
         </div>
 
-        {/* Monthly Target Progress */}
-        {target > 0 && (
-          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-lg border border-indigo-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-indigo-700">Progresso Obiettivo Mensile</span>
-              <span className="text-sm font-bold text-indigo-900">€{calculations.totalCommission} / €{target}</span>
-            </div>
-            <Progress value={calculations.targetProgress} className="h-3" />
-            <div className="mt-2 text-xs text-indigo-600">
-              {calculations.targetProgress >= 100 
-                ? "🎉 Obiettivo raggiunto!" 
-                : `Mancano €${target - calculations.totalCommission} all'obiettivo`}
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

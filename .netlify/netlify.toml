@@ -25,6 +25,13 @@ functions = "/Users/debbypalazzogmail.com/Downloads/sempliswitch/netlify/functio
 
 [build.services]
 
+[dev]
+command = "npm run dev:vite"
+port = 8888.0
+targetPort = 8080.0
+publish = "dist/spa"
+functions = "netlify/functions"
+
 [functions]
 
 [functions."*"]

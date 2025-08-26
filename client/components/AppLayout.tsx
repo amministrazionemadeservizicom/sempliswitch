@@ -12,7 +12,7 @@ interface AppLayoutProps {
   showNavigation?: boolean;
 }
 
-export default function AppLayout({ 
+export default function AppLayout({
   children,
   userRole = "consulente",
   showNavigation = true
@@ -20,35 +20,90 @@ export default function AppLayout({
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userFullName, setUserFullName] = useState<string>("");
+  const [userData, setUserData] = useState<any>(null);
 
   useEffect(() => {
-    const fetchUserName = async () => {
+    const fetchUserData = async () => {
       try {
         const uid = localStorage.getItem("uid");
+        const storedUserName = localStorage.getItem("userName");
+        const storedUserRole = localStorage.getItem("userRole");
+        const storedUserEmail = localStorage.getItem("userEmail");
+
+        console.log('🔍 AppLayout: localStorage data:', {
+          uid,
+          userName: storedUserName,
+          userRole: storedUserRole,
+          userEmail: storedUserEmail
+        });
+
+        // First, set data from localStorage immediately
+        if (storedUserName && storedUserName !== 'Utente') {
+          setUserFullName(storedUserName);
+          console.log('✅ AppLayout: Set userFullName from localStorage:', storedUserName);
+        }
+
         if (!uid) {
-          setUserFullName("Utente");
+          setUserFullName(storedUserName || "Utente");
+          setUserData(null);
           return;
         }
 
-        const userDoc = await getDoc(doc(db, "utenti", uid));
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          // Try fullName first, then concatenate nome + cognome, fallback to "Utente"
-          const fullName = userData.fullName ||
-                            (userData.nome && userData.cognome ? `${userData.nome} ${userData.cognome}` : null) ||
-                           "Utente";
-          setUserFullName(fullName);
-        } else {
-          setUserFullName("Utente");
+        // Then try to get updated data from Firebase
+        try {
+          const userDoc = await getDoc(doc(db, "utenti", uid));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            setUserData({ ...data, uid });
+
+            // Handle both possible field name formats and update localStorage if needed
+            const nome = data.nome || data.Nome || "";
+            const cognome = data.cognome || data.Cognome || "";
+            const fullName = data.fullName ||
+                              (nome && cognome ? `${nome} ${cognome}`.trim() : null) ||
+                              storedUserName ||
+                              "Utente";
+
+            setUserFullName(fullName);
+
+            // Update localStorage if Firebase has newer data
+            if (fullName !== storedUserName && fullName !== "Utente") {
+              localStorage.setItem("userName", fullName);
+            }
+
+            console.log('✅ AppLayout: Updated userFullName from Firebase:', fullName);
+          } else {
+            // Firebase doc doesn't exist, keep localStorage data
+            setUserFullName(storedUserName || "Utente");
+            console.log('⚠️ AppLayout: No Firebase doc, using localStorage:', storedUserName);
+          }
+        } catch (firebaseError) {
+          // Firebase error, keep localStorage data
+          console.warn('Firebase error in AppLayout, using localStorage:', firebaseError);
+          setUserFullName(storedUserName || "Utente");
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
-        setUserFullName("Utente");
+        const storedUserName = localStorage.getItem("userName");
+        setUserFullName(storedUserName || "Utente");
+        setUserData(null);
       }
     };
 
-    fetchUserName();
+    fetchUserData();
   }, []);
+
+
+  const handleUserClick = () => {
+    console.log('👆 AppLayout: User clicked, checking localStorage...');
+    console.log('uid:', localStorage.getItem('uid'));
+    console.log('userName:', localStorage.getItem('userName'));
+    console.log('userRole:', localStorage.getItem('userRole'));
+    console.log('userEmail:', localStorage.getItem('userEmail'));
+    console.log('Current userFullName state:', userFullName);
+
+    navigate('/profile');
+  };
 
   const handleLogout = () => {
     localStorage.clear();
@@ -64,10 +119,11 @@ export default function AppLayout({
       {/* Desktop Sidebar */}
       <Sidebar
         userRole={userRole}
-      isCollapsed={sidebarCollapsed}
-      onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-      userFullName={userFullName}  // 👈 passa il nome/cognome alla Sidebar
-       />
+        isCollapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        userFullName={userFullName}
+        onUserClick={handleUserClick}
+      />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
@@ -82,10 +138,15 @@ export default function AppLayout({
             </div>
                        
             <div className="flex items-center gap-2">
-              <span className="text-sm" style={{ color: '#333333' }}>
+              <button
+                onClick={handleUserClick}
+                className="text-sm hover:bg-black hover:bg-opacity-10 px-2 py-1 rounded-lg transition-colors"
+                style={{ color: '#333333' }}
+                title="Vai al mio profilo"
+              >
                 <User className="h-4 w-4 inline mr-1" />
-                {userFullName}
-              </span>
+                {userFullName || 'Utente'}
+              </button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -110,10 +171,14 @@ export default function AppLayout({
             </div>
                        
             <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold text-gray-800">
+              <button
+                onClick={handleUserClick}
+                className="text-sm font-semibold text-gray-800 hover:bg-black hover:bg-opacity-10 px-3 py-1 rounded-lg transition-colors"
+                title="Vai al mio profilo"
+              >
                 <User className="h-4 w-4 inline mr-1" />
-                {userFullName}
-              </span>
+                {userFullName || 'Utente'}
+              </button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -131,9 +196,8 @@ export default function AppLayout({
         <main className="flex-1 overflow-y-auto pb-[calc(72px+env(safe-area-inset-bottom))] lg:pb-0">
           {children}
         </main>
-
-    
       </div>
+
     </div>
   );
 }

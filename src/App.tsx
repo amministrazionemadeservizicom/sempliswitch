@@ -25,6 +25,8 @@ import AdminOffers from "../client/pages/AdminOffers";
 import NotFound from "../client/pages/NotFound";
 import CreateUser from "../client/pages/CreateUser";
 import Users from "../client/pages/users";
+import WorkQueue from "../client/pages/WorkQueue";
+import Processing from "../client/pages/Processing";
 
 // LOGIN FORM (se davvero è qui)
 import LoginForm from "./components/LoginForm";
@@ -54,7 +56,7 @@ const App = () => {
               element={
                 userRole === "admin"
                   ? <Navigate to="/admin-dashboard" replace />
-                  : <Dashboard userRole="consulente" />
+                  : <Dashboard userRole={userRole || "consulente"} />
               }
             />
 
@@ -75,15 +77,43 @@ const App = () => {
             {/* Users (protetta) */}
             <Route path="/users" element={<Users />} />
 
+            {/* Work Queue (protetta - solo back office e admin) */}
+            <Route
+              path="/work-queue"
+              element={
+                (userRole === "admin" || userRole === "back office") ? (
+                  <WorkQueue />
+                ) : (
+                  <p style={{ padding: "2rem", fontSize: 18, color: "red" }}>
+                    Accesso negato: questa pagina è riservata agli operatori Back Office e Admin.
+                  </p>
+                )
+              }
+            />
+
+            {/* Processing Status (protetta - back office, admin e master) */}
+            <Route
+              path="/processing"
+              element={
+                (userRole === "admin" || userRole === "back office" || userRole === "master") ? (
+                  <Processing />
+                ) : (
+                  <p style={{ padding: "2rem", fontSize: 18, color: "red" }}>
+                    Accesso negato: questa pagina è riservata agli operatori Back Office, Admin e Master.
+                  </p>
+                )
+              }
+            />
+
             {/* Create user (protetta) */}
             <Route
               path="/create-user"
               element={
-                userRole === "admin" ? (
+                (userRole === "admin" || userRole === "master") ? (
                   <CreateUser />
                 ) : (
                   <p style={{ padding: "2rem", fontSize: 18, color: "red" }}>
-                    Accesso negato: questa pagina è riservata agli admin.
+                    Accesso negato: questa pagina è riservata agli admin e master.
                   </p>
                 )
               }
@@ -98,6 +128,7 @@ const App = () => {
             <Route path="/simulation" element={<Simulation />} />
             <Route path="/commissions" element={<Commissions />} />
             <Route path="/commission-plans" element={<CommissionPlans />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="/contracts" element={<Contracts />} />
             <Route path="/compile-contract" element={<CompileContract />} />
             <Route path="/widget-test" element={<WidgetTest />} />

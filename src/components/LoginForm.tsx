@@ -40,12 +40,25 @@ const LoginForm = () => {
       const userDoc = await getDoc(doc(db, "utenti", user.uid));
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        const role = userData.ruolo?.toLowerCase() || "consulente"; // ✅ <-- Campo corretto
-        const fullName = `${userData.Nome || ""} ${userData.Cognome || ""}`.trim();
+        const role = userData.ruolo?.toLowerCase() || "consulente";
 
-        // ✅ Salva in localStorage
+        // Handle both possible field name formats (Nome/Cognome vs nome/cognome)
+        const nome = userData.nome || userData.Nome || "";
+        const cognome = userData.cognome || userData.Cognome || "";
+        const fullName = `${nome} ${cognome}`.trim() || "Utente";
+
+        // ✅ Salva TUTTI i dati necessari in localStorage
+        localStorage.setItem("uid", user.uid);
         localStorage.setItem("userName", fullName);
         localStorage.setItem("userRole", role);
+        localStorage.setItem("userEmail", user.email || "");
+
+        console.log('✅ Login: Saved to localStorage:', {
+          uid: user.uid,
+          userName: fullName,
+          userRole: role,
+          userEmail: user.email
+        });
 
         if (rememberMe) {
           localStorage.setItem("login_email", email);
@@ -56,6 +69,16 @@ const LoginForm = () => {
         }
 
         setMessage(`✅ Accesso effettuato come ${user.email}`);
+
+        // Test localStorage data immediately
+        setTimeout(() => {
+          console.log('🧪 Test: localStorage after login:', {
+            uid: localStorage.getItem('uid'),
+            userName: localStorage.getItem('userName'),
+            userRole: localStorage.getItem('userRole'),
+            userEmail: localStorage.getItem('userEmail')
+          });
+        }, 500);
 
         setTimeout(() => {
           if (role === "admin") {

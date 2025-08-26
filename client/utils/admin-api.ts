@@ -13,6 +13,10 @@ interface AdminApiInterface {
       codiceFiscale: string;
     };
     ragioneSociale?: string;
+    lock?: any;
+    cronologiaStati?: any[];
+    dataUltimaIntegrazione?: string;
+    nuoviPodAggiunti?: boolean;
   }): Promise<any>;
   deleteContract(contractId: string): Promise<any>;
   createUser(userData: {
@@ -290,6 +294,107 @@ export const adminApi: AdminApiInterface = {
       return result.data;
     } catch (error: any) {
       console.error('❌ Error saving contract via admin API:', error);
+      throw error;
+    }
+  },
+
+  // Lock/unlock contract for processing
+  async lockContract(contractId: string, lockData: {
+    lockedBy: {
+      id: string;
+      nome: string;
+      cognome: string;
+      ruolo: string;
+    };
+    dataLock: string;
+    inScadenza: boolean;
+  }) {
+    try {
+      const response = await fetch(`/.netlify/functions/admin-contracts?id=${contractId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'lock',
+          lock: lockData,
+          statoOfferta: 'In Lavorazione'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error: any) {
+      console.error('❌ Error locking contract:', error);
+      throw error;
+    }
+  },
+
+  async unlockContract(contractId: string) {
+    try {
+      const response = await fetch(`/.netlify/functions/admin-contracts?id=${contractId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'unlock',
+          lock: null
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error: any) {
+      console.error('❌ Error unlocking contract:', error);
+      throw error;
+    }
+  },
+
+  // Get contracts with advanced filtering
+  async getContractsFiltered(filters: {
+    status?: string;
+    createdBy?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    gestore?: string;
+    tipologia?: string;
+    onlyLocked?: boolean;
+    onlyMine?: boolean;
+    userId?: string;
+  }) {
+    try {
+      const queryParams = new URLSearchParams();
+
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, value.toString());
+        }
+      });
+
+      const response = await fetch(`/.netlify/functions/admin-contracts?${queryParams}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result.contracts || [];
+    } catch (error: any) {
+      console.error('❌ Error fetching filtered contracts:', error);
       throw error;
     }
   },

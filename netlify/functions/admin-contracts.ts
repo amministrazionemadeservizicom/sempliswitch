@@ -1,187 +1,96 @@
-// Admin API utilities for Firebase operations
+import { Context } from "@netlify/functions";
 
-// Define the interface for adminApi to ensure TypeScript recognizes all methods
-interface AdminApiInterface {
-  getAllContracts(): Promise<any[]>;
-  updateContractStatus(contractId: string, status: string, notes?: string): Promise<any>;
-  updateContract(contractId: string, updateData: {
-    statoOfferta?: string;
-    noteStatoOfferta?: string;
-    contatto?: {
-      nome: string;
-      cognome: string;
-      codiceFiscale: string;
-    };
-    ragioneSociale?: string;
-  }): Promise<any>;
-  deleteContract(contractId: string): Promise<any>;
-  createUser(userData: {
-    nome: string;
-    email: string;
-    password: string;
-    ruolo: string;
-    stato: boolean;
-    pianoCompensi?: string;
-    gestoriAssegnati?: string[];
-    master?: string;
-  }): Promise<any>;
-  testFirebaseAdmin(): Promise<any>;
-}
+export default async (request: Request, context: Context) => {
+  // Set CORS headers
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Content-Type': 'application/json'
+  };
 
-export const adminApi: AdminApiInterface = {
-  // Get all contracts using admin privileges
-  async getAllContracts() {
-    try {
-      const response = await fetch('/.netlify/functions/admin-contracts', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
+  // Handle preflight requests
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 200, headers });
+  }
+
+  try {
+    const url = new URL(request.url);
+    const method = request.method;
+    const contractId = url.searchParams.get('id');
+
+    // Dynamically import Firebase Admin to avoid initialization issues
+    const { adminOperations } = await import('../../server/firebase-admin');
+
+    switch (method) {
+      case 'GET':
+        // Get all contracts with admin privileges
+        const contracts = await adminOperations.getAllContracts();
+        return new Response(JSON.stringify({
+          success: true,
+          contracts,
+          count: contracts.length
+        }), { status: 200, headers });
+
+      case 'PUT':
+        // Update contract status or full contract
+        if (!contractId) {
+          return new Response(JSON.stringify({
+            error: 'Contract ID is required'
+          }), { status: 400, headers });
         }
-      });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+        const updateData = await request.json();
 
-      const result = await response.json();
-      return result.contracts || [];
-    } catch (error: any) {
-      console.error('❌ Error fetching contracts via admin API:', error);
-      throw error;
-    }
-  },
-
-  // Update contract status using admin privileges
-  async updateContractStatus(contractId: string, status: string, notes?: string) {
-    try {
-      const response = await fetch(`/.netlify/functions/admin-contracts?id=${contractId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          status,
-          notes: notes || ''
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      return result;
-    } catch (error: any) {
-      console.error('❌ Error updating contract status:', error);
-      throw error;
-    }
-  },
-
-  // Update full contract using admin privileges
-  async updateContract(contractId: string, updateData: {
-    statoOfferta?: string;
-    noteStatoOfferta?: string;
-    contatto?: {
-      nome: string;
-      cognome: string;
-      codiceFiscale: string;
-    };
-    ragioneSociale?: string;
-  }) {
-    try {
-      const response = await fetch(`/.netlify/functions/admin-contracts?id=${contractId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'updateFull',
-          ...updateData
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      return result;
-    } catch (error: any) {
-      console.error('❌ Error updating contract:', error);
-      throw error;
-    }
-  },
-
-  // Delete contract using admin privileges
-  async deleteContract(contractId: string) {
-    try {
-      const response = await fetch(`/.netlify/functions/admin-contracts?id=${contractId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json'
+        if (updateData.action === 'updateFull') {
+          // Full contract update
+          await adminOperations.updateContract(contractId, {
+            statoOfferta: updateData.statoOfferta,
+            noteStatoOfferta: updateData.noteStatoOfferta,
+            contatto: updateData.contatto,
+            ragioneSociale: updateData.ragioneSociale
+          });
+        } else {
+          // Status update only (backward compatibility)
+          await adminOperations.updateContractStatus(
+            contractId,
+            updateData.status,
+            updateData.notes
+          );
         }
-      });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+        return new Response(JSON.stringify({
+          success: true,
+          message: 'Contract updated successfully'
+        }), { status: 200, headers });
 
-      const result = await response.json();
-      return result;
-    } catch (error: any) {
-      console.error('❌ Error deleting contract:', error);
-      throw error;
+      case 'DELETE':
+        // Delete contract
+        if (!contractId) {
+          return new Response(JSON.stringify({
+            error: 'Contract ID is required'
+          }), { status: 400, headers });
+        }
+
+        await adminOperations.deleteContract(contractId);
+
+        return new Response(JSON.stringify({
+          success: true,
+          message: 'Contract deleted successfully'
+        }), { status: 200, headers });
+
+      default:
+        return new Response(JSON.stringify({
+          error: 'Method not allowed'
+        }), { status: 405, headers });
     }
-  },
 
-  // Create user using admin privileges
-  async createUser(userData: {
-    nome: string;
-    email: string;
-    password: string;
-    ruolo: string;
-    stato: boolean;
-    pianoCompensi?: string;
-    gestoriAssegnati?: string[];
-    master?: string;
-  }) {
-    try {
-      const response = await fetch('/.netlify/functions/create-user', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(userData)
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      return result;
-    } catch (error: any) {
-      console.error('❌ Error creating user via admin API:', error);
-      throw error;
-    }
-  },
-
-  // Test Firebase Admin SDK
-  async testFirebaseAdmin() {
-    try {
-      const response = await fetch('/.netlify/functions/test-firebase-admin');
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      return result;
-    } catch (error: any) {
-      console.error('❌ Error testing Firebase Admin:', error);
-      throw error;
-    }
+  } catch (error: any) {
+    console.error('❌ Admin contracts API error:', error);
+    
+    return new Response(JSON.stringify({
+      error: 'Internal server error',
+      details: error.message
+    }), { status: 500, headers });
   }
 };
-
-export default adminApi;
