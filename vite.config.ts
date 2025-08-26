@@ -14,8 +14,9 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    expressPlugin(),
-    copyRedirectsPlugin(), // ✅ AGGIUNTO QUI
+    // Only use Express plugin in standalone Vite mode, not with Netlify Dev
+    ...(process.env.VITE_STANDALONE ? [expressPlugin()] : []),
+    copyRedirectsPlugin(),
   ],
   resolve: {
     alias: {
